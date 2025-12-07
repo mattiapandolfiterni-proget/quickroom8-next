@@ -6,7 +6,7 @@ import SEO from "@/components/SEO";
 import { Search, Home, Users, Heart, Sparkles, Filter, Shield, CreditCard, HeadphonesIcon, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client.ts";
 import { useLanguage } from "@/contexts/LanguageContext";
 import room1 from "../assets/room-1.jpg";
 import room2 from "../assets/room-2.jpg";

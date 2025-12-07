@@ -13,7 +13,7 @@ import { AddReview } from '@/components/AddReview';
 import { ReviewsList } from '@/components/ReviewsList';
 import { ReportDialog } from '@/components/ReportDialog';
 import { RequestAppointmentDialog } from '@/components/RequestAppointmentDialog';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 import { toast } from '@/hooks/use-toast';
 import { useCompatibilityScore } from '@/hooks/useCompatibilityScore';
 import {

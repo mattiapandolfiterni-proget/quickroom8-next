@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client.ts";
 
 export const useEmailNotifications = () => {
   const sendEmail = async (to: string, subject: string, title: string, content: string, link?: string) => {
