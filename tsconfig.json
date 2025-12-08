@@ -1,12 +1,9 @@
 {
+  "extends": "next/core-web-vitals",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/components/*": ["app/components/*"],
-      "@/contexts/*": ["app/contexts/*"],
-      "@/integrations/*": ["app/integrations/*"],
-      "@/pages/*": ["app/pages/*"],
-      "@/lib/*": ["lib/*"]
+      "@/*": ["app/*"]
     }
   },
   "include": ["next-env.d.ts", "*/.ts", "*/.tsx"],
