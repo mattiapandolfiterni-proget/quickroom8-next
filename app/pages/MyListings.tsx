@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client.ts';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, Home, Edit, Trash2, Eye, EyeOff, Plus, Rocket, BarChart3 } from 'lucide-react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';

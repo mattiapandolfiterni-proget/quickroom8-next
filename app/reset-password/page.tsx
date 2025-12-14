@@ -12,7 +12,7 @@ export default function ResetPasswordPage({
     (searchParams?.access_token as string | undefined);
 
   if (token) {
-    redirect(/auth/reset-password/${token});
+    redirect(`/auth/reset-password/${token}`);
   }
 
   redirect("/auth/reset-password");

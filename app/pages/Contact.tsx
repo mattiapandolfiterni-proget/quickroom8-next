@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client.ts';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Mail, MessageSquare, Phone } from 'lucide-react';
 import { z } from 'zod';
@@ -62,7 +62,7 @@ const Contact = () => {
       });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
+        toast.error(error.issues[0].message);
       } else {
         console.error('Error sending message:', error);
         toast.error('Failed to send message. Please try again.');

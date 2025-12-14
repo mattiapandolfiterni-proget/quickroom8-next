@@ -8,7 +8,7 @@ import { SaveSearchDialog } from '@/components/SaveSearchDialog';
 import { SavedSearches } from '@/components/SavedSearches';
 import Map from '@/components/Map';
 import { Search, Filter, SlidersHorizontal, LayoutGrid, MapIcon, Plus } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client.ts';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';

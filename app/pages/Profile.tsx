@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { ReviewsList } from '@/components/ReviewsList';
-import { supabase } from '@/integrations/supabase/client.ts';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, User, Plus } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
@@ -83,7 +83,7 @@ const Profile = () => {
       if (!result.success) {
         toast({
           title: "Validation Error",
-          description: result.error.errors[0].message,
+          description: result.error.issues[0].message,
           variant: "destructive",
         });
         setLoading(false);

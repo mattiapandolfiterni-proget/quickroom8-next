@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client.ts";
+import { supabase } from "@/integrations/supabase/client";
 import { useEmailNotifications } from "./useEmailNotifications";
 
 interface CreateNotificationParams {

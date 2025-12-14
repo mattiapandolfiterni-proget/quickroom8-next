@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/Header';
 import { RoomCard } from '@/components/RoomCard';
-import { supabase } from '@/integrations/supabase/client.ts';
+import { supabase } from '@/integrations/supabase/client';
 import { Heart } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 

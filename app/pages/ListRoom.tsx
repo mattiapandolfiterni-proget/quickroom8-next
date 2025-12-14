@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { supabase } from '@/integrations/supabase/client.ts';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, Home, Plus, Trash2, Users } from 'lucide-react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -173,7 +173,7 @@ const ListRoom = () => {
     if (!result.success) {
       toast({
         title: "Validation Error",
-        description: result.error.errors[0].message,
+        description: result.error.issues[0].message,
         variant: "destructive",
       });
       setLoading(false);

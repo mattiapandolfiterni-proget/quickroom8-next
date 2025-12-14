@@ -6,7 +6,7 @@ import { MapPin, BedDouble, Bath, Wifi, CheckCircle2, Heart, Rocket } from "luci
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client.ts";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCompatibilityScore } from "@/hooks/useCompatibilityScore";
 import { useListingBoost } from "@/hooks/useListingBoost";
