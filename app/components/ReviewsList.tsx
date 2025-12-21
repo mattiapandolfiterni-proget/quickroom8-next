@@ -72,11 +72,23 @@ export const ReviewsList = ({ listingId, userId }: ReviewsListProps) => {
 
           if (listingId) {
             const { data: fallbackData } = await fallbackQuery.eq('listing_id', listingId);
-            setReviews((fallbackData || []) as any);
+            const reviewsData = (fallbackData || []) as Review[];
+            setReviews(reviewsData);
+            // Calculate average rating for fallback data
+            if (reviewsData.length > 0) {
+              const avg = reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length;
+              setAverageRating(Math.round(avg * 10) / 10);
+            }
             return;
           } else if (userId) {
             const { data: fallbackData } = await fallbackQuery.eq('reviewed_id', userId);
-            setReviews((fallbackData || []) as any);
+            const reviewsData = (fallbackData || []) as Review[];
+            setReviews(reviewsData);
+            // Calculate average rating for fallback data
+            if (reviewsData.length > 0) {
+              const avg = reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length;
+              setAverageRating(Math.round(avg * 10) / 10);
+            }
             return;
           }
         }

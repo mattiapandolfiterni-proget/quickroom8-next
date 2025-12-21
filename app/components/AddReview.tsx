@@ -57,21 +57,26 @@ export const AddReview = ({ listingId, reviewedId, onReviewAdded }: AddReviewPro
       if (error) throw error;
 
       // Notify admins about new review pending approval
-      const { data: adminRoles } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'admin');
+      // Wrapped in try-catch so notification failure doesn't affect success message
+      try {
+        const { data: adminRoles } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'admin');
 
-      if (adminRoles && adminRoles.length > 0) {
-        const notifications = adminRoles.map(admin => ({
-          user_id: admin.user_id,
-          title: 'New Review Pending Approval',
-          content: `A new ${rating}-star review has been submitted and requires moderation.`,
-          type: 'review',
-          link: '/admin?tab=reviews'
-        }));
+        if (adminRoles && adminRoles.length > 0) {
+          const notifications = adminRoles.map(admin => ({
+            user_id: admin.user_id,
+            title: 'New Review Pending Approval',
+            content: `A new ${rating}-star review has been submitted and requires moderation.`,
+            type: 'review',
+            link: '/admin?tab=reviews'
+          }));
 
-        await supabase.from('notifications').insert(notifications);
+          await supabase.from('notifications').insert(notifications);
+        }
+      } catch {
+        // Notification failure is non-critical - review was already saved
       }
 
       toast({
