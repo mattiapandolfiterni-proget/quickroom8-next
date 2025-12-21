@@ -1,9 +1,9 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import dynamicImport from "next/dynamic";
 
 // Load App.tsx with SSR disabled (required for React Router DOM)
-const App = dynamic(() => import("../App"), {
+const App = dynamicImport(() => import("../App"), {
   ssr: false,
   loading: () => (
     <div style={{ 
@@ -39,4 +39,3 @@ const App = dynamic(() => import("../App"), {
 export default function CatchAllPage() {
   return <App />;
 }
-
