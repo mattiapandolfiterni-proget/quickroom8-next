@@ -1,3 +1,6 @@
+// FORCE DYNAMIC - Disables SSG globally to prevent build hangs
+export const dynamic = 'force-dynamic';
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
