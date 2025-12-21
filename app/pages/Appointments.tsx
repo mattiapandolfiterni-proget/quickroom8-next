@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Header } from '@/components/Header';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -39,13 +39,7 @@ export default function Appointments() {
   const [requestedAppointments, setRequestedAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      fetchAppointments();
-    }
-  }, [user]);
-
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
@@ -72,10 +66,16 @@ export default function Appointments() {
       .eq('requester_id', user.id)
       .order('appointment_date', { ascending: true });
 
-    if (received) setReceivedAppointments(received as any);
-    if (requested) setRequestedAppointments(requested as any);
+    if (received) setReceivedAppointments(received as Appointment[]);
+    if (requested) setRequestedAppointments(requested as Appointment[]);
     setLoading(false);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchAppointments();
+    }
+  }, [user, fetchAppointments]);
 
   const updateAppointmentStatus = async (id: string, status: string) => {
     const { error } = await supabase

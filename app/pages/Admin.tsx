@@ -337,6 +337,46 @@ export default function Admin() {
     }
   };
 
+  const updateReviewStatus = async (reviewId: string, status: 'approved' | 'rejected') => {
+    const { data: review } = await supabase
+      .from('reviews')
+      .select('reviewer_id')
+      .eq('id', reviewId)
+      .single();
+
+    const { error } = await supabase
+      .from('reviews')
+      .update({ status })
+      .eq('id', reviewId);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update review status",
+        variant: "destructive"
+      });
+    } else {
+      // Notify the reviewer about their review status
+      if (review) {
+        await supabase.from('notifications').insert({
+          user_id: review.reviewer_id,
+          title: status === 'approved' ? 'Review Approved' : 'Review Rejected',
+          content: status === 'approved' 
+            ? 'Your review has been approved and is now visible.'
+            : 'Your review did not meet our community guidelines.',
+          type: 'review',
+          link: '/profile'
+        });
+      }
+
+      toast({
+        title: "Success",
+        description: `Review ${status} successfully`
+      });
+      loadReviews();
+    }
+  };
+
   const loadReports = async () => {
     const { data, error } = await supabase
       .from('reports')
@@ -1272,7 +1312,7 @@ export default function Admin() {
             <Card>
               <CardHeader>
                 <CardTitle>Reviews Management</CardTitle>
-                <CardDescription>Manage user reviews and ratings</CardDescription>
+                <CardDescription>Manage user reviews and ratings - reviews require approval before being visible</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -1282,6 +1322,7 @@ export default function Admin() {
                       <TableHead>Reviewed</TableHead>
                       <TableHead>Rating</TableHead>
                       <TableHead>Comment</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -1301,16 +1342,43 @@ export default function Admin() {
                           {review.comment || 'No comment'}
                         </TableCell>
                         <TableCell>
+                          <Badge variant={
+                            review.status === 'approved' ? 'default' :
+                            review.status === 'rejected' ? 'destructive' : 'secondary'
+                          }>
+                            {review.status || 'pending'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           {new Date(review.created_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => deleteReview(review.id)}
-                          >
-                            Delete
-                          </Button>
+                          <div className="flex gap-2">
+                            {(!review.status || review.status === 'pending') && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => updateReviewStatus(review.id, 'approved')}
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateReviewStatus(review.id, 'rejected')}
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => deleteReview(review.id)}
+                            >
+                              Delete
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

@@ -37,7 +37,8 @@ const Browse = () => {
 
   const fetchListings = async () => {
     try {
-      // Fetch all active listings with flatmates
+      // Fetch only active AND verified/approved listings
+      // Both conditions must be true for public visibility
       const { data: listingsData, error: listingsError } = await supabase
         .from('room_listings')
         .select(`
@@ -54,6 +55,7 @@ const Browse = () => {
           )
         `)
         .eq('is_active', true)
+        .eq('is_verified', true) // CRITICAL: Only show admin-approved listings
         .order('created_at', { ascending: false });
 
       if (listingsError) throw listingsError;

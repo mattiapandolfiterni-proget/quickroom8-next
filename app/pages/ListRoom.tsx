@@ -191,7 +191,6 @@ const ListRoom = () => {
     }
 
     if (!roomType || !contractType) {
-      console.error('Missing values - roomType:', roomType, 'contractType:', contractType);
       toast({
         title: 'Required Fields',
         description: 'Please select both room type and contract type',
@@ -206,7 +205,6 @@ const ListRoom = () => {
     const validContractTypes = ['short_term', 'long_term', 'flexible'];
     
     if (!validRoomTypes.includes(roomType)) {
-      console.error('Invalid roomType:', roomType);
       toast({
         title: 'Invalid Room Type',
         description: `Room type must be one of: ${validRoomTypes.join(', ')}`,
@@ -217,7 +215,6 @@ const ListRoom = () => {
     }
     
     if (!validContractTypes.includes(contractType)) {
-      console.error('Invalid contractType:', contractType);
       toast({
         title: 'Invalid Contract Type',
         description: `Contract type must be one of: ${validContractTypes.join(', ')}`,
@@ -226,10 +223,6 @@ const ListRoom = () => {
       setLoading(false);
       return;
     }
-
-    console.log('Submitting listing with roomType:', roomType, 'contractType:', contractType);
-
-    console.log('Submitting listing with roomType:', roomType, 'contractType:', contractType);
 
     // Build amenities array from switches - read DOM elements directly
     const form = e.target as HTMLFormElement;
@@ -313,16 +306,13 @@ const ListRoom = () => {
         // Geocode address to get coordinates
         if (listing.address) {
           try {
-            console.log('Geocoding address for updated listing:', listing.address);
             await supabase.functions.invoke('geocode-address', {
               body: { 
                 address: listing.address,
                 listingId: editId 
               }
             });
-            console.log('Geocoding completed');
-          } catch (geocodeError) {
-            console.error('Geocoding failed:', geocodeError);
+          } catch {
             // Non-blocking error - listing still saved
           }
         }
@@ -333,10 +323,6 @@ const ListRoom = () => {
           .select('user_id')
           .eq('role', 'admin');
 
-        if (adminError) {
-          console.error('Error fetching admin roles:', adminError);
-        }
-
         if (adminRoles && adminRoles.length > 0) {
           const notifications = adminRoles.map(admin => ({
             user_id: admin.user_id,
@@ -346,12 +332,7 @@ const ListRoom = () => {
             link: '/admin?tab=listings'
           }));
 
-          const { error: notifError } = await supabase.from('notifications').insert(notifications);
-          if (notifError) {
-            console.error('Error creating notifications:', notifError);
-          } else {
-            console.log('Notifications created successfully for', adminRoles.length, 'admins');
-          }
+          await supabase.from('notifications').insert(notifications);
         }
 
         // Delete old flatmates and insert new ones
@@ -395,16 +376,13 @@ const ListRoom = () => {
         // Geocode address to get coordinates
         if (listingData && listing.address) {
           try {
-            console.log('Geocoding address for new listing:', listing.address);
             await supabase.functions.invoke('geocode-address', {
               body: { 
                 address: listing.address,
                 listingId: listingData.id 
               }
             });
-            console.log('Geocoding completed');
-          } catch (geocodeError) {
-            console.error('Geocoding failed:', geocodeError);
+          } catch {
             // Non-blocking error - listing still saved
           }
         }
@@ -415,10 +393,6 @@ const ListRoom = () => {
           .select('user_id')
           .eq('role', 'admin');
 
-        if (adminError) {
-          console.error('Error fetching admin roles:', adminError);
-        }
-
         if (adminRoles && adminRoles.length > 0) {
           const notifications = adminRoles.map(admin => ({
             user_id: admin.user_id,
@@ -428,12 +402,7 @@ const ListRoom = () => {
             link: '/admin?tab=listings'
           }));
 
-          const { error: notifError } = await supabase.from('notifications').insert(notifications);
-          if (notifError) {
-            console.error('Error creating notifications:', notifError);
-          } else {
-            console.log('Notifications created successfully for', adminRoles.length, 'admins');
-          }
+          await supabase.from('notifications').insert(notifications);
         }
 
         // Insert flatmates if any

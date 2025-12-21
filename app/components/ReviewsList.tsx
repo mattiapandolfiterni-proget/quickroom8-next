@@ -10,6 +10,7 @@ interface Review {
   rating: number;
   comment: string | null;
   created_at: string;
+  status?: 'pending' | 'approved' | 'rejected';
   reviewer: {
     full_name: string;
     avatar_url: string | null;
@@ -39,8 +40,10 @@ export const ReviewsList = ({ listingId, userId }: ReviewsListProps) => {
           rating,
           comment,
           created_at,
+          status,
           reviewer:profiles!reviewer_id(full_name, avatar_url)
         `)
+        .eq('status', 'approved') // CRITICAL: Only show admin-approved reviews
         .order('created_at', { ascending: false });
 
       if (listingId) {
@@ -51,7 +54,34 @@ export const ReviewsList = ({ listingId, userId }: ReviewsListProps) => {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        // If status column doesn't exist yet, fall back to showing all reviews
+        // This is a graceful degradation for database migration
+        if (error.code === '42703') { // Column does not exist
+          console.warn('Review status column not found, fetching all reviews');
+          const fallbackQuery = supabase
+            .from('reviews')
+            .select(`
+              id,
+              rating,
+              comment,
+              created_at,
+              reviewer:profiles!reviewer_id(full_name, avatar_url)
+            `)
+            .order('created_at', { ascending: false });
+
+          if (listingId) {
+            const { data: fallbackData } = await fallbackQuery.eq('listing_id', listingId);
+            setReviews((fallbackData || []) as any);
+            return;
+          } else if (userId) {
+            const { data: fallbackData } = await fallbackQuery.eq('reviewed_id', userId);
+            setReviews((fallbackData || []) as any);
+            return;
+          }
+        }
+        throw error;
+      }
 
       setReviews(data as any);
 

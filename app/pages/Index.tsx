@@ -8,10 +8,11 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
-import room1 from "../assets/room-1.jpg";
-import room2 from "../assets/room-2.jpg";
-import room3 from "../assets/room-3.jpg";
-import heroBG from "../assets/hero-bg.jpg";
+// Static images from public folder
+const room1 = "/assets/room-1.jpg";
+const room2 = "/assets/room-2.jpg";
+const room3 = "/assets/room-3.jpg";
+const heroBG = "/assets/hero-bg.jpg";
 
 
 interface Flatmate {
@@ -50,7 +51,7 @@ const Index = () => {
 
   const fetchFeaturedRooms = async () => {
     try {
-      // Fetch active listings
+      // Fetch only active AND verified/approved listings for public display
       const { data: listingsData, error: listingsError } = await supabase
         .from('room_listings')
         .select(`
@@ -58,6 +59,7 @@ const Index = () => {
           flatmates(id, name, age, nationality, occupation, traits)
         `)
         .eq('is_active', true)
+        .eq('is_verified', true) // CRITICAL: Only show admin-approved listings
         .order('created_at', { ascending: false })
         .limit(20);
 

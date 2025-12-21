@@ -52,8 +52,6 @@ export const BoostListingDialog = ({ open, onOpenChange, listingId, listingTitle
       const pkg = BOOST_PACKAGES.find(p => p.id === selectedPackage);
       if (!pkg) throw new Error('Invalid package selected');
 
-      console.log('Creating boost payment for listing:', listingId, 'package:', pkg);
-
       const { data, error } = await supabase.functions.invoke('create-boost-payment', {
         body: {
           listing_id: listingId,
@@ -62,30 +60,21 @@ export const BoostListingDialog = ({ open, onOpenChange, listingId, listingTitle
         },
       });
 
-      console.log('Boost payment response:', { data, error });
-
       if (error) {
-        console.error('Error from edge function:', error);
         throw new Error(error.message || 'Failed to create payment session');
       }
 
       // Check if data exists and has url
       if (!data) {
-        console.error('No data received from edge function');
         throw new Error('No response received from payment service');
       }
-
-      console.log('Payment data received:', data);
 
       // The url might be directly in data or in data.url depending on the response structure
       const paymentUrl = data.url || data;
       
       if (!paymentUrl || typeof paymentUrl !== 'string') {
-        console.error('Invalid payment URL:', paymentUrl);
         throw new Error('Invalid payment URL received');
       }
-
-      console.log('Redirecting to Stripe payment URL:', paymentUrl);
       
       toast.loading('Opening payment page...', { duration: 2000 });
       
@@ -95,7 +84,6 @@ export const BoostListingDialog = ({ open, onOpenChange, listingId, listingTitle
       }, 300);
       
     } catch (error: any) {
-      console.error('Error creating boost payment:', error);
       toast.error(error.message || 'Failed to create payment. Please try again.');
       setLoading(false);
     }

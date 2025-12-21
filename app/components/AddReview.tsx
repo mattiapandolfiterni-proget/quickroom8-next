@@ -42,6 +42,7 @@ export const AddReview = ({ listingId, reviewedId, onReviewAdded }: AddReviewPro
     try {
       setSubmitting(true);
 
+      // Insert review with pending status for admin approval
       const { error } = await supabase.from('reviews').insert([
         {
           reviewer_id: user.id,
@@ -49,23 +50,43 @@ export const AddReview = ({ listingId, reviewedId, onReviewAdded }: AddReviewPro
           listing_id: listingId || null,
           rating,
           comment: comment.trim() || null,
+          status: 'pending', // Reviews require admin approval before being visible
         },
       ]);
 
       if (error) throw error;
 
+      // Notify admins about new review pending approval
+      const { data: adminRoles } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin');
+
+      if (adminRoles && adminRoles.length > 0) {
+        const notifications = adminRoles.map(admin => ({
+          user_id: admin.user_id,
+          title: 'New Review Pending Approval',
+          content: `A new ${rating}-star review has been submitted and requires moderation.`,
+          type: 'review',
+          link: '/admin?tab=reviews'
+        }));
+
+        await supabase.from('notifications').insert(notifications);
+      }
+
       toast({
-        title: 'Success',
-        description: 'Your review has been posted',
+        title: 'Review Submitted',
+        description: 'Your review has been submitted and will be visible after approval.',
       });
 
       setRating(0);
       setComment('');
       onReviewAdded?.();
     } catch (error: any) {
+      console.error('Error submitting review:', error);
       toast({
         title: 'Error',
-        description: error.message,
+        description: error.message || 'Failed to submit review',
         variant: 'destructive',
       });
     } finally {

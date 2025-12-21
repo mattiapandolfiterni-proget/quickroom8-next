@@ -26,38 +26,29 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
   useEffect(() => {
     const fetchToken = async (retryCount = 0) => {
       try {
-        console.log('Fetching Mapbox token...', retryCount > 0 ? `(Retry ${retryCount})` : '');
         const { data, error } = await supabase.functions.invoke('get-mapbox-token');
         
         if (error) {
-          console.error('Error from edge function:', error);
-          
           // Retry up to 3 times with exponential backoff
           if (retryCount < 3) {
             const delay = Math.pow(2, retryCount) * 1000;
-            console.log(`Retrying in ${delay}ms...`);
             setTimeout(() => fetchToken(retryCount + 1), delay);
             return;
           }
           throw error;
         }
         
-        console.log('Edge function response:', data);
-        
         if (data?.token) {
-          console.log('✓ Mapbox token received successfully');
           setMapboxToken(data.token);
         } else {
-          console.error('✗ No token in response:', data);
-          
           // Retry if no token received
           if (retryCount < 3) {
             setTimeout(() => fetchToken(retryCount + 1), 2000);
             return;
           }
         }
-      } catch (error) {
-        console.error('✗ Fatal error fetching Mapbox token:', error);
+      } catch {
+        // Silent fail - map will show loading state
       }
     };
     
@@ -65,18 +56,10 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
   }, []);
 
   useEffect(() => {
-    if (!mapContainer.current) {
-      console.log('Map container not ready');
-      return;
-    }
-    
-    if (!mapboxToken) {
-      console.log('Waiting for Mapbox token...');
+    if (!mapContainer.current || !mapboxToken) {
       return;
     }
 
-    console.log('Initializing Mapbox map...');
-    
     try {
       mapboxgl.accessToken = mapboxToken;
       
@@ -85,14 +68,6 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
         style: 'mapbox://styles/mapbox/streets-v12',
         center: center,
         zoom: zoom,
-      });
-
-      map.current.on('load', () => {
-        console.log('✓ Mapbox map loaded successfully');
-      });
-
-      map.current.on('error', (e) => {
-        console.error('✗ Mapbox error:', e);
       });
 
       // Disable scroll zoom to prevent interfering with page scroll
@@ -112,15 +87,12 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
         }),
         'top-right'
       );
-
-      console.log('✓ Map initialized with', listings.length, 'listings');
-    } catch (error) {
-      console.error('✗ Error initializing map:', error);
+    } catch {
+      // Silent fail - map will show loading state
     }
 
     return () => {
       if (map.current) {
-        console.log('Cleaning up map...');
         map.current.remove();
       }
     };
@@ -134,10 +106,6 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
     markers.current = [];
 
     // Add new markers for listings with coordinates
-    console.log(`Processing ${listings.length} listings for map markers`);
-    const listingsWithCoords = listings.filter(l => l.latitude && l.longitude);
-    console.log(`Found ${listingsWithCoords.length} listings with valid coordinates`);
-    
     listings.forEach(listing => {
       if (listing.latitude && listing.longitude) {
         const el = document.createElement('div');

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar } from 'lucide-react';
+import { Calendar, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 interface RequestAppointmentDialogProps {
@@ -33,46 +33,85 @@ export const RequestAppointmentDialog = ({ listingId, ownerId }: RequestAppointm
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    if (!user || !date) {
-      toast.error('Please select a date and time');
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to request a viewing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!date) {
+      toast({
+        title: "Date Required",
+        description: "Please select a date and time",
+        variant: "destructive",
+      });
       return;
     }
 
     setLoading(true);
 
-    const [hours, minutes] = time.split(':');
-    const appointmentDate = new Date(date);
-    appointmentDate.setHours(parseInt(hours), parseInt(minutes));
+    try {
+      const [hours, minutes] = time.split(':');
+      const appointmentDate = new Date(date);
+      appointmentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
-    const { error } = await supabase.from('viewing_appointments').insert({
-      listing_id: listingId,
-      owner_id: ownerId,
-      requester_id: user.id,
-      appointment_date: appointmentDate.toISOString(),
-      notes: notes || null,
-    });
+      // Validate appointment is in the future
+      if (appointmentDate <= new Date()) {
+        toast({
+          title: "Invalid Date",
+          description: "Please select a future date and time",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
 
-    if (error) {
-      console.error('Error creating appointment:', error);
-      toast.error('Failed to request viewing');
-    } else {
+      // Insert appointment with explicit status field
+      const { data, error } = await supabase.from('viewing_appointments').insert({
+        listing_id: listingId,
+        owner_id: ownerId,
+        requester_id: user.id,
+        appointment_date: appointmentDate.toISOString(),
+        notes: notes.trim() || null,
+        status: 'pending', // Explicitly set status
+      }).select().single();
+
+      if (error) {
+        throw new Error(error.message || 'Failed to create appointment');
+      }
+
       // Create notification for owner
-      await supabase.from('notifications').insert({
+      const { error: notifError } = await supabase.from('notifications').insert({
         user_id: ownerId,
         title: 'New Viewing Request',
-        content: 'Someone requested a viewing for your listing',
+        content: `You have a new viewing request for ${format(appointmentDate, 'PPP')} at ${time}`,
         type: 'appointment',
         link: '/appointments'
       });
 
-      toast.success('Viewing request sent successfully');
+      // Don't fail the appointment creation for notification failure
+
+      toast({
+        title: "Request Sent!",
+        description: `Your viewing request for ${format(appointmentDate, 'PPP')} has been sent`,
+      });
+
       setOpen(false);
       setDate(undefined);
       setTime('10:00');
       setNotes('');
+    } catch (error: any) {
+      toast({
+        title: "Failed to Request Viewing",
+        description: error.message || "Please try again later",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -160,7 +199,14 @@ export const RequestAppointmentDialog = ({ listingId, ownerId }: RequestAppointm
             Cancel
           </Button>
           <Button onClick={handleSubmit} className="flex-1" disabled={loading || !date}>
-            {loading ? 'Sending...' : 'Send Request'}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              'Send Request'
+            )}
           </Button>
         </div>
       </DialogContent>

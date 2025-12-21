@@ -721,15 +721,29 @@ const translations: Record<Language, Record<string, string>> = {
 };
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<Language>(() => {
+  // Inizializza con default 'en' - localStorage viene letto solo dopo il mount
+  const [language, setLanguageState] = useState<Language>('en');
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Leggi localStorage SOLO dopo il mount (client-side)
+  // This is a known hydration pattern - setState in effect is intentional here
+  useEffect(() => {
     const saved = localStorage.getItem('language');
     const validLanguages: Language[] = ['en', 'mt', 'fr', 'es', 'it', 'de', 'ru'];
-    return (validLanguages.includes(saved as Language) ? saved : 'en') as Language;
-  });
+    if (saved && validLanguages.includes(saved as Language)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLanguageState(saved as Language);
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsHydrated(true);
+  }, []);
 
+  // Salva in localStorage quando cambia la lingua (solo se hydrated)
   useEffect(() => {
-    localStorage.setItem('language', language);
-  }, [language]);
+    if (isHydrated) {
+      localStorage.setItem('language', language);
+    }
+  }, [language, isHydrated]);
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);

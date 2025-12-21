@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,9 +33,10 @@ const profileSchema = z.object({
 });
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -43,11 +45,23 @@ const Profile = () => {
     }
   }, [user]);
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container py-12 flex justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
 
   const fetchProfile = async () => {
+    setProfileLoading(true);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -59,6 +73,13 @@ const Profile = () => {
       setProfile(data);
     } catch (error) {
       console.error('Error fetching profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load profile data",
+        variant: "destructive",
+      });
+    } finally {
+      setProfileLoading(false);
     }
   };
 
@@ -68,14 +89,35 @@ const Profile = () => {
 
     const formData = new FormData(e.currentTarget);
     
+    // Helper functions for proper value extraction
+    const getString = (key: string): string | null => {
+      const value = formData.get(key) as string;
+      return value && value.trim() !== '' ? value.trim() : null;
+    };
+    
+    const getNumber = (key: string): number | null => {
+      const value = formData.get(key) as string;
+      if (!value || value.trim() === '') return null;
+      const num = parseInt(value, 10);
+      return isNaN(num) ? null : num;
+    };
+    
+    const getArray = (key: string): string[] | null => {
+      const value = formData.get(key) as string;
+      if (!value || value.trim() === '') return null;
+      const arr = value.split(',').map(l => l.trim()).filter(Boolean);
+      return arr.length > 0 ? arr : null;
+    };
+    
+    // Build validation data
     const validationData = {
-      full_name: formData.get('full_name') as string,
-      age: formData.get('age') ? parseInt(formData.get('age') as string) : undefined,
-      nationality: (formData.get('nationality') as string) || undefined,
-      occupation: (formData.get('occupation') as string) || undefined,
-      bio: (formData.get('bio') as string) || undefined,
-      budget_min: formData.get('budget_min') ? parseInt(formData.get('budget_min') as string) : undefined,
-      budget_max: formData.get('budget_max') ? parseInt(formData.get('budget_max') as string) : undefined,
+      full_name: getString('full_name') || '',
+      age: getNumber('age') ?? undefined,
+      nationality: getString('nationality') ?? undefined,
+      occupation: getString('occupation') ?? undefined,
+      bio: getString('bio') ?? undefined,
+      budget_min: getNumber('budget_min') ?? undefined,
+      budget_max: getNumber('budget_max') ?? undefined,
     };
 
     try {
@@ -90,45 +132,58 @@ const Profile = () => {
         return;
       }
 
-      const updates = {
-        id: user.id,
-        full_name: formData.get('full_name') as string,
-        age: parseInt(formData.get('age') as string) || undefined,
-        nationality: (formData.get('nationality') as string) || undefined,
-        occupation: (formData.get('occupation') as string) || undefined,
-        bio: (formData.get('bio') as string) || undefined,
-        gender: formData.get('gender') as string || undefined,
-        languages: formData.get('languages') ? (formData.get('languages') as string).split(',').map(l => l.trim()) : undefined,
+      // Build complete update object - use null for empty values to clear them
+      const updates: Record<string, any> = {
+        full_name: getString('full_name'),
+        age: getNumber('age'),
+        nationality: getString('nationality'),
+        occupation: getString('occupation'),
+        bio: getString('bio'),
+        gender: getString('gender'),
+        languages: getArray('languages'),
         is_smoker: formData.get('is_smoker') === 'true',
         has_pets: formData.get('has_pets') === 'true',
-        cleanliness_level: (formData.get('cleanliness_level') as string) || undefined,
-        noise_tolerance: (formData.get('noise_tolerance') as string) || undefined,
-        wake_up_time: (formData.get('wake_up_time') as string) || undefined,
-        bed_time: (formData.get('bed_time') as string) || undefined,
-        social_preference: (formData.get('social_preference') as string) || undefined,
-        work_schedule: (formData.get('work_schedule') as string) || undefined,
-        budget_min: parseInt(formData.get('budget_min') as string) || undefined,
-        budget_max: parseInt(formData.get('budget_max') as string) || undefined,
-        preferred_room_type: (formData.get('preferred_room_type') as string) || undefined,
-        preferred_locations: formData.get('preferred_locations') ? (formData.get('preferred_locations') as string).split(',').map(l => l.trim()) : undefined,
-        must_have_amenities: formData.get('must_have_amenities') ? (formData.get('must_have_amenities') as string).split(',').map(a => a.trim()) : undefined,
+        cleanliness_level: getString('cleanliness_level'),
+        noise_tolerance: getString('noise_tolerance'),
+        wake_up_time: getString('wake_up_time'),
+        bed_time: getString('bed_time'),
+        social_preference: getString('social_preference'),
+        work_schedule: getString('work_schedule'),
+        budget_min: getNumber('budget_min'),
+        budget_max: getNumber('budget_max'),
+        preferred_room_type: getString('preferred_room_type'),
+        preferred_locations: getArray('preferred_locations'),
+        must_have_amenities: getArray('must_have_amenities'),
         updated_at: new Date().toISOString(),
-      } as any;
+      };
 
-      const { error } = await supabase
+      // Use UPDATE instead of UPSERT to ensure all fields are updated
+      const { data, error } = await supabase
         .from('profiles')
-        .upsert([updates]);
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Profile update error:', error);
+        throw error;
+      }
+
+      // Update local state with the returned data
+      if (data) {
+        setProfile(data);
+      }
 
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
       });
     } catch (error: any) {
+      console.error('Profile save error:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to update profile",
         variant: "destructive",
       });
     } finally {
@@ -137,8 +192,14 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background py-12">
-      <div className="container max-w-2xl">
+    <div className="min-h-screen bg-background">
+      <Header />
+      {profileLoading ? (
+        <div className="container py-12 flex justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      ) : (
+      <div className="container max-w-2xl py-12">
         <div className="flex items-center justify-between gap-3 mb-8">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
@@ -459,6 +520,7 @@ const Profile = () => {
           </TabsContent>
         </Tabs>
       </div>
+      )}
     </div>
   );
 };

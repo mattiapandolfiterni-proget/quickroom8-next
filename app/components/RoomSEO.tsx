@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 
 interface RoomSEOProps {
@@ -16,6 +17,12 @@ interface RoomSEOProps {
 }
 
 const RoomSEO = ({ room }: RoomSEOProps) => {
+  // Calculate price valid date once on mount
+  const priceValidUntil = useMemo(() => {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 30);
+    return futureDate.toISOString().split('T')[0];
+  }, []);
   const title = `${room.title} - €${room.price}/month in ${room.location}`;
   const description = room.description 
     ? room.description.substring(0, 160) 
@@ -35,7 +42,7 @@ const RoomSEO = ({ room }: RoomSEOProps) => {
       '@type': 'Offer',
       price: room.price,
       priceCurrency: 'EUR',
-      priceValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      priceValidUntil: priceValidUntil,
       availability: 'https://schema.org/InStock',
       url: url,
       seller: {

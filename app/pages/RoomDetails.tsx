@@ -18,7 +18,7 @@ import { toast } from '@/hooks/use-toast';
 import { useCompatibilityScore } from '@/hooks/useCompatibilityScore';
 import {
   MapPin, Calendar, BedDouble, Bath, Home, Wifi, Wind, Zap, Car,
-  PawPrint, Euro, MessageCircle, Heart, Share2, ChevronLeft, CheckCircle2, AlertTriangle, Plus
+  PawPrint, Euro, MessageCircle, Heart, Share2, ChevronLeft, CheckCircle2, AlertTriangle, Plus, Loader2
 } from 'lucide-react';
 import {
   Carousel,
@@ -35,6 +35,7 @@ const RoomDetails = () => {
   const [listing, setListing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [messagingLoading, setMessagingLoading] = useState(false);
   const { score: compatibilityScore } = useCompatibilityScore(id || '');
 
   useEffect(() => {
@@ -62,6 +63,30 @@ const RoomDetails = () => {
         .single();
 
       if (error) throw error;
+
+      // Check if listing is approved for public viewing
+      // Allow owner to view their own listing regardless of status
+      if (data && !data.is_active && data.owner_id !== user?.id) {
+        toast({
+          title: "Listing Unavailable",
+          description: "This listing is no longer available",
+          variant: "destructive",
+        });
+        setListing(null);
+        return;
+      }
+
+      // For non-owners, also check verification status
+      if (data && !data.is_verified && data.owner_id !== user?.id) {
+        toast({
+          title: "Listing Pending Approval",
+          description: "This listing is awaiting approval",
+          variant: "destructive",
+        });
+        setListing(null);
+        return;
+      }
+
       setListing(data);
     } catch (error) {
       console.error('Error fetching listing:', error);
@@ -137,15 +162,80 @@ const RoomDetails = () => {
       return;
     }
 
+    if (!listing?.owner_id) {
+      toast({
+        title: "Error",
+        description: "Unable to contact owner. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prevent messaging yourself
+    if (user.id === listing.owner_id) {
+      toast({
+        title: "Notice",
+        description: "This is your own listing.",
+      });
+      return;
+    }
+
+    setMessagingLoading(true);
+
     try {
-      // Create conversation
+      // First, check if a conversation already exists between these users for this listing
+      const { data: existingConversations } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      let existingConversationId: string | null = null;
+
+      if (existingConversations && existingConversations.length > 0) {
+        // Check if any of these conversations include the owner and are for this listing
+        for (const conv of existingConversations) {
+          const { data: participants } = await supabase
+            .from('conversation_participants')
+            .select('user_id')
+            .eq('conversation_id', conv.conversation_id);
+          
+          const { data: convDetails } = await supabase
+            .from('conversations')
+            .select('listing_id')
+            .eq('id', conv.conversation_id)
+            .single();
+
+          if (
+            participants?.some(p => p.user_id === listing.owner_id) &&
+            convDetails?.listing_id === id
+          ) {
+            existingConversationId = conv.conversation_id;
+            break;
+          }
+        }
+      }
+
+      if (existingConversationId) {
+        // Conversation already exists, navigate to messages
+        toast({
+          title: "Opening conversation",
+          description: "You already have a conversation with this owner",
+        });
+        navigate('/messages');
+        return;
+      }
+
+      // Create new conversation
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
         .insert([{ listing_id: id }])
         .select()
         .single();
 
-      if (convError) throw convError;
+      if (convError) {
+        console.error('Error creating conversation:', convError);
+        throw new Error('Failed to create conversation');
+      }
 
       // Add participants
       const { error: participantError } = await supabase
@@ -155,7 +245,21 @@ const RoomDetails = () => {
           { conversation_id: conversation.id, user_id: listing.owner_id }
         ]);
 
-      if (participantError) throw participantError;
+      if (participantError) {
+        console.error('Error adding participants:', participantError);
+        // Rollback: delete the conversation if participants failed
+        await supabase.from('conversations').delete().eq('id', conversation.id);
+        throw new Error('Failed to add participants to conversation');
+      }
+
+      // Create notification for the owner
+      await supabase.from('notifications').insert({
+        user_id: listing.owner_id,
+        title: 'New Message',
+        content: `Someone is interested in your listing: ${listing.title}`,
+        type: 'message',
+        link: '/messages'
+      });
 
       toast({
         title: "Conversation started",
@@ -164,11 +268,14 @@ const RoomDetails = () => {
       
       navigate('/messages');
     } catch (error: any) {
+      console.error('Error starting conversation:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to start conversation. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setMessagingLoading(false);
     }
   };
 
@@ -468,9 +575,19 @@ const RoomDetails = () => {
                   onClick={handleStartConversation}
                   className="w-full h-12 text-base font-semibold"
                   size="lg"
+                  disabled={messagingLoading}
                 >
-                  <MessageCircle className="w-5 h-5 mr-2" />
-                  Message Owner
+                  {messagingLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Starting Chat...
+                    </>
+                  ) : (
+                    <>
+                      <MessageCircle className="w-5 h-5 mr-2" />
+                      Message Owner
+                    </>
+                  )}
                 </Button>
                 <Button
                   onClick={toggleFavorite}
