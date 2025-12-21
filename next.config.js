@@ -1,12 +1,27 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
-  images: { unoptimized: true },
-  experimental: {
-    missingSuspenseWithCSRBailout: false,
-  },
-  // This prevents the build from timing out
-  staticPageGenerationTimeout: 1000,
-};
-module.exports = nextConfig;
+    // Ignora errori di TypeScript durante il build
+    typescript: {
+      ignoreBuildErrors: true,
+    },
+    // Ignora errori di stile (ESLint) durante il build
+    eslint: {
+      ignoreDuringBuilds: true,
+    },
+    // Evita che le immagini facciano crashare il sito
+    images: {
+      unoptimized: true,
+      remotePatterns: [
+        {
+          protocol: "https",
+          hostname: "**",
+        },
+      ],
+    },
+    // Evita errori strani se usi Suspense
+    experimental: {
+      missingSuspenseWithCSRBailout: false,
+    },
+  };
+  
+  module.exports = nextConfig;
