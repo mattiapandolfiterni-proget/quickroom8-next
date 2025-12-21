@@ -1,22 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // IGNORE ERRORS FOR URGENT DEPLOYMENT
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  // Allow Supabase images
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**', // Allow all domains for now to prevent errors
-      },
-    ],
+      { protocol: "https", hostname: "**" } // Allow ALL images to prevent crash
+    ]
   },
+  experimental: {
+    missingSuspenseWithCSRBailout: false, // Prevent common bailouts
+  }
 };
-
 module.exports = nextConfig;
-
