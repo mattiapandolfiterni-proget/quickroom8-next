@@ -1371,13 +1371,13 @@ export default function Admin() {
                                 </Button>
                               </>
                             )}
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => deleteReview(review.id)}
-                            >
-                              Delete
-                            </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteReview(review.id)}
+                          >
+                            Delete
+                          </Button>
                           </div>
                         </TableCell>
                       </TableRow>

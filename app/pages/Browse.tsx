@@ -58,18 +58,24 @@ const Browse = () => {
         .eq('is_verified', true) // CRITICAL: Only show admin-approved listings
         .order('created_at', { ascending: false });
 
-      if (listingsError) throw listingsError;
+      if (listingsError) {
+        console.error('Error fetching listings:', listingsError.message);
+        throw listingsError;
+      }
 
-      // Fetch active boosts
-      const { data: boostsData, error: boostsError } = await supabase
-        .from('listing_boosts')
-        .select('listing_id')
-        .eq('payment_status', 'completed')
-        .gt('expires_at', new Date().toISOString());
+      // Fetch active boosts (non-critical, don't fail if this errors)
+      let boostedListingIds = new Set<string>();
+      try {
+        const { data: boostsData } = await supabase
+          .from('listing_boosts')
+          .select('listing_id')
+          .eq('payment_status', 'completed')
+          .gt('expires_at', new Date().toISOString());
 
-      if (boostsError) throw boostsError;
-
-      const boostedListingIds = new Set(boostsData?.map(b => b.listing_id) || []);
+        boostedListingIds = new Set(boostsData?.map(b => b.listing_id) || []);
+      } catch {
+        // Boosts fetch failed, continue without boost sorting
+      }
 
       // Sort listings: boosted first, then by created_at
       const sortedListings = (listingsData || []).sort((a, b) => {
@@ -83,8 +89,9 @@ const Browse = () => {
       });
 
       setListings(sortedListings);
-    } catch (error) {
-      console.error('Error fetching listings:', error);
+    } catch (error: any) {
+      console.error('Error fetching listings:', error?.message || error);
+      setListings([]);
     } finally {
       setLoading(false);
     }

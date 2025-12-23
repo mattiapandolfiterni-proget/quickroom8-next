@@ -63,18 +63,24 @@ const Index = () => {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      if (listingsError) throw listingsError;
+      if (listingsError) {
+        console.error('Error fetching listings:', listingsError.message);
+        throw listingsError;
+      }
 
-      // Fetch active boosts
-      const { data: boostsData, error: boostsError } = await supabase
-        .from('listing_boosts')
-        .select('listing_id')
-        .eq('payment_status', 'completed')
-        .gt('expires_at', new Date().toISOString());
+      // Fetch active boosts (non-critical, don't fail if this errors)
+      let boostedListingIds = new Set<string>();
+      try {
+        const { data: boostsData } = await supabase
+          .from('listing_boosts')
+          .select('listing_id')
+          .eq('payment_status', 'completed')
+          .gt('expires_at', new Date().toISOString());
 
-      if (boostsError) throw boostsError;
-
-      const boostedListingIds = new Set(boostsData?.map(b => b.listing_id) || []);
+        boostedListingIds = new Set(boostsData?.map(b => b.listing_id) || []);
+      } catch {
+        // Boosts fetch failed, continue without boost sorting
+      }
 
       // Sort: boosted first, then by created_at
       const sortedListings = (listingsData || []).sort((a, b) => {
@@ -104,8 +110,10 @@ const Index = () => {
         }));
         setFeaturedRooms(formattedRooms);
       }
-    } catch (error) {
-      console.error('Error fetching rooms:', error);
+    } catch (error: any) {
+      console.error('Error fetching rooms:', error?.message || error);
+      // Still show some content even if fetch fails
+      setFeaturedRooms([]);
     } finally {
       setLoading(false);
     }
