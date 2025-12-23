@@ -15,8 +15,8 @@ interface Appointment {
   id: string;
   appointment_date: string;
   notes: string | null;
-  status: string;
-  created_at: string;
+  status: string | null;
+  created_at: string | null;
   listing: {
     id: string;
     title: string;
@@ -44,31 +44,91 @@ export default function Appointments() {
 
     setLoading(true);
 
-    // Fetch appointments where user is owner
-    const { data: received } = await supabase
-      .from('viewing_appointments')
-      .select(`
-        *,
-        listing:room_listings!viewing_appointments_listing_id_fkey(id, title, location),
-        requester:profiles!viewing_appointments_requester_id_fkey(full_name, email)
-      `)
-      .eq('owner_id', user.id)
-      .order('appointment_date', { ascending: true });
+    try {
+      // Fetch appointments where user is owner (received requests)
+      const { data: received, error: receivedError } = await supabase
+        .from('viewing_appointments')
+        .select('*')
+        .eq('owner_id', user.id)
+        .order('appointment_date', { ascending: true });
 
-    // Fetch appointments where user is requester
-    const { data: requested } = await supabase
-      .from('viewing_appointments')
-      .select(`
-        *,
-        listing:room_listings!viewing_appointments_listing_id_fkey(id, title, location),
-        owner:profiles!viewing_appointments_owner_id_fkey(full_name, email)
-      `)
-      .eq('requester_id', user.id)
-      .order('appointment_date', { ascending: true });
+      if (receivedError) {
+        console.error('Error fetching received appointments:', receivedError);
+        toast.error('Failed to load received appointments');
+      }
 
-    if (received) setReceivedAppointments(received as Appointment[]);
-    if (requested) setRequestedAppointments(requested as Appointment[]);
-    setLoading(false);
+      // Fetch appointments where user is requester (sent requests)
+      const { data: requested, error: requestedError } = await supabase
+        .from('viewing_appointments')
+        .select('*')
+        .eq('requester_id', user.id)
+        .order('appointment_date', { ascending: true });
+
+      if (requestedError) {
+        console.error('Error fetching requested appointments:', requestedError);
+        toast.error('Failed to load requested appointments');
+      }
+
+      // Enrich received appointments with listing and requester info
+      const enrichedReceived = await Promise.all(
+        (received || []).map(async (appointment) => {
+          // Get listing info
+          const { data: listing } = await supabase
+            .from('room_listings')
+            .select('id, title, location')
+            .eq('id', appointment.listing_id)
+            .single();
+
+          // Get requester profile
+          const { data: requester } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', appointment.requester_id)
+            .single();
+
+          return {
+            ...appointment,
+            listing: listing || { id: appointment.listing_id, title: 'Unknown Listing', location: 'Unknown' },
+            requester: requester || { full_name: 'Unknown User', email: '' },
+            owner: { full_name: '', email: '' }
+          };
+        })
+      );
+
+      // Enrich requested appointments with listing and owner info
+      const enrichedRequested = await Promise.all(
+        (requested || []).map(async (appointment) => {
+          // Get listing info
+          const { data: listing } = await supabase
+            .from('room_listings')
+            .select('id, title, location')
+            .eq('id', appointment.listing_id)
+            .single();
+
+          // Get owner profile
+          const { data: owner } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', appointment.owner_id)
+            .single();
+
+          return {
+            ...appointment,
+            listing: listing || { id: appointment.listing_id, title: 'Unknown Listing', location: 'Unknown' },
+            owner: owner || { full_name: 'Unknown User', email: '' },
+            requester: { full_name: '', email: '' }
+          };
+        })
+      );
+
+      setReceivedAppointments(enrichedReceived as Appointment[]);
+      setRequestedAppointments(enrichedRequested as Appointment[]);
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+      toast.error('Failed to load appointments');
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -91,14 +151,15 @@ export default function Appointments() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | null | undefined) => {
+    const normalizedStatus = status || 'pending';
     const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
       pending: 'default',
       confirmed: 'secondary',
       cancelled: 'destructive',
       completed: 'outline',
     };
-    return <Badge variant={variants[status] || 'default'}>{status}</Badge>;
+    return <Badge variant={variants[normalizedStatus] || 'default'}>{normalizedStatus}</Badge>;
   };
 
   const AppointmentCard = ({ appointment, isOwner }: { appointment: Appointment; isOwner: boolean }) => (
@@ -132,7 +193,7 @@ export default function Appointments() {
           </div>
           <div className="flex items-center gap-2 text-sm">
             <User className="w-4 h-4" />
-            <span>{isOwner ? appointment.requester.full_name : appointment.owner.full_name}</span>
+            <span>{isOwner ? (appointment.requester?.full_name || 'Unknown User') : (appointment.owner?.full_name || 'Unknown User')}</span>
           </div>
         </div>
 
@@ -142,7 +203,7 @@ export default function Appointments() {
           </div>
         )}
 
-        {appointment.status === 'pending' && isOwner && (
+        {(appointment.status === 'pending' || !appointment.status) && isOwner && (
           <div className="flex gap-2">
             <Button
               onClick={() => updateAppointmentStatus(appointment.id, 'confirmed')}
