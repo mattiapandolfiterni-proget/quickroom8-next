@@ -184,10 +184,15 @@ const RoomDetails = () => {
 
     try {
       // First, check if a conversation already exists between these users for this listing
-      const { data: existingConversations } = await supabase
+      const { data: existingConversations, error: fetchError } = await supabase
         .from('conversation_participants')
         .select('conversation_id')
         .eq('user_id', user.id);
+
+      if (fetchError) {
+        console.error('Error fetching conversations:', fetchError);
+        throw new Error('Failed to check existing conversations');
+      }
 
       let existingConversationId: string | null = null;
 
@@ -228,37 +233,53 @@ const RoomDetails = () => {
       // Create new conversation
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
-        .insert([{ listing_id: id }])
+        .insert({ listing_id: id })
         .select()
         .single();
 
       if (convError) {
         console.error('Error creating conversation:', convError);
-        throw new Error('Failed to create conversation');
+        throw new Error(convError.message || 'Failed to create conversation');
       }
 
-      // Add participants
-      const { error: participantError } = await supabase
+      if (!conversation) {
+        throw new Error('Conversation was not created');
+      }
+
+      // Add current user as participant first
+      const { error: myParticipantError } = await supabase
         .from('conversation_participants')
-        .insert([
-          { conversation_id: conversation.id, user_id: user.id },
-          { conversation_id: conversation.id, user_id: listing.owner_id }
-        ]);
+        .insert({ conversation_id: conversation.id, user_id: user.id });
 
-      if (participantError) {
-        console.error('Error adding participants:', participantError);
-        // Rollback: delete the conversation if participants failed
+      if (myParticipantError) {
+        console.error('Error adding user as participant:', myParticipantError);
+        // Rollback: delete the conversation
         await supabase.from('conversations').delete().eq('id', conversation.id);
-        throw new Error('Failed to add participants to conversation');
+        throw new Error(myParticipantError.message || 'Failed to join conversation');
       }
 
-      // Create notification for the owner
-      await supabase.from('notifications').insert({
+      // Add owner as participant
+      const { error: ownerParticipantError } = await supabase
+        .from('conversation_participants')
+        .insert({ conversation_id: conversation.id, user_id: listing.owner_id });
+
+      if (ownerParticipantError) {
+        console.error('Error adding owner as participant:', ownerParticipantError);
+        // Rollback: delete participants and conversation
+        await supabase.from('conversation_participants').delete().eq('conversation_id', conversation.id);
+        await supabase.from('conversations').delete().eq('id', conversation.id);
+        throw new Error(ownerParticipantError.message || 'Failed to add owner to conversation');
+      }
+
+      // Create notification for the owner (non-blocking)
+      supabase.from('notifications').insert({
         user_id: listing.owner_id,
         title: 'New Message',
         content: `Someone is interested in your listing: ${listing.title}`,
         type: 'message',
         link: '/messages'
+      }).then(({ error }) => {
+        if (error) console.error('Failed to send notification:', error);
       });
 
       toast({

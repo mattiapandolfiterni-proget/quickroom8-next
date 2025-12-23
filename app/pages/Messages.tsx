@@ -70,18 +70,102 @@ const Messages = () => {
   }
 
   const fetchConversations = async () => {
-    const { data } = await supabase
-      .from('conversation_participants')
-      .select(`
-        conversation_id,
-        conversations (
-          id,
-          created_at
-        )
-      `)
-      .eq('user_id', user.id);
+    try {
+      // Get conversations the user is part of
+      const { data: participantData, error: participantError } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
 
-    setConversations(data?.map(d => d.conversations) || []);
+      if (participantError) {
+        console.error('Error fetching participant data:', participantError);
+        toast({
+          title: "Error",
+          description: "Failed to load conversations",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!participantData || participantData.length === 0) {
+        setConversations([]);
+        return;
+      }
+
+      const conversationIds = participantData.map(p => p.conversation_id);
+
+      // Fetch conversation details with listing info
+      const { data: conversationsData, error: convError } = await supabase
+        .from('conversations')
+        .select(`
+          id,
+          created_at,
+          updated_at,
+          listing_id,
+          room_listings (
+            title,
+            location
+          )
+        `)
+        .in('id', conversationIds)
+        .order('updated_at', { ascending: false });
+
+      if (convError) {
+        console.error('Error fetching conversations:', convError);
+        toast({
+          title: "Error",
+          description: "Failed to load conversation details",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // For each conversation, get the other participant's info
+      const conversationsWithParticipants = await Promise.all(
+        (conversationsData || []).map(async (conv) => {
+          const { data: participants } = await supabase
+            .from('conversation_participants')
+            .select(`
+              user_id,
+              profiles (
+                full_name,
+                avatar_url
+              )
+            `)
+            .eq('conversation_id', conv.id)
+            .neq('user_id', user.id);
+
+          const otherUser = participants?.[0]?.profiles;
+          
+          // Get the last message for preview
+          const { data: lastMessage } = await supabase
+            .from('messages')
+            .select('content, created_at, sender_id')
+            .eq('conversation_id', conv.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          return {
+            ...conv,
+            otherUserName: otherUser?.full_name || 'User',
+            otherUserAvatar: otherUser?.avatar_url,
+            lastMessage: lastMessage?.content,
+            lastMessageTime: lastMessage?.created_at,
+            listingTitle: conv.room_listings?.title
+          };
+        })
+      );
+
+      setConversations(conversationsWithParticipants);
+    } catch (error) {
+      console.error('Error in fetchConversations:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+    }
   };
 
   const fetchMessages = async (conversationId: string) => {
@@ -97,17 +181,46 @@ const Messages = () => {
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation) return;
 
-    await supabase
-      .from('messages')
-      .insert({
-        conversation_id: selectedConversation,
-        sender_id: user.id,
-        content: newMessage,
-        message_type: 'text'
-      });
+    const messageContent = newMessage.trim();
+    setNewMessage(''); // Clear immediately for better UX
 
-    setNewMessage('');
-    handleTyping(false);
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: selectedConversation,
+          sender_id: user.id,
+          content: messageContent,
+          message_type: 'text'
+        });
+
+      if (error) {
+        console.error('Error sending message:', error);
+        setNewMessage(messageContent); // Restore message on error
+        toast({
+          title: "Error",
+          description: error.message || "Failed to send message",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Update conversation's updated_at timestamp
+      await supabase
+        .from('conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', selectedConversation);
+
+      handleTyping(false);
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      setNewMessage(messageContent); // Restore message on error
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleTyping = async (typing: boolean) => {
@@ -202,14 +315,26 @@ const Messages = () => {
                     >
                       <div className="flex items-center gap-3">
                         <Avatar>
-                          <AvatarFallback>U</AvatarFallback>
+                          <AvatarFallback>
+                            {conv.otherUserName?.charAt(0)?.toUpperCase() || 'U'}
+                          </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">Conversation</p>
+                          <p className="font-medium truncate">{conv.otherUserName || 'User'}</p>
+                          {conv.listingTitle && (
+                            <p className="text-xs text-primary truncate">
+                              {conv.listingTitle}
+                            </p>
+                          )}
                           <p className="text-sm text-muted-foreground truncate">
-                            Click to view messages
+                            {conv.lastMessage || 'Start a conversation'}
                           </p>
                         </div>
+                        {conv.lastMessageTime && (
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(conv.lastMessageTime).toLocaleDateString()}
+                          </span>
+                        )}
                       </div>
                     </button>
                   ))}
