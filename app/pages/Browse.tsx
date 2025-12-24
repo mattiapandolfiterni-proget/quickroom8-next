@@ -8,7 +8,7 @@ import { SaveSearchDialog } from '@/components/SaveSearchDialog';
 import { SavedSearches } from '@/components/SavedSearches';
 import Map from '@/components/Map';
 import { Search, Filter, SlidersHorizontal, LayoutGrid, MapIcon, Plus } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
@@ -40,6 +40,14 @@ const Browse = () => {
   }, []);
 
   const fetchListings = async () => {
+    // Check if Supabase is properly configured
+    if (!isSupabaseConfigured) {
+      log.warn('Supabase not configured - skipping data fetch');
+      setListings([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       // Fetch only active AND verified/approved listings
       // Both conditions must be true for public visibility

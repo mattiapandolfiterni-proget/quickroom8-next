@@ -6,7 +6,7 @@ import SEO from "@/components/SEO";
 import { Search, Home, Users, Heart, Sparkles, Filter, Shield, CreditCard, HeadphonesIcon, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { RoomCardSkeleton } from "@/components/LoadingState";
 import { logger } from "@/lib/logger";
@@ -54,6 +54,14 @@ const Index = () => {
   }, []);
 
   const fetchFeaturedRooms = async () => {
+    // Check if Supabase is properly configured
+    if (!isSupabaseConfigured) {
+      log.warn('Supabase not configured - skipping data fetch');
+      setFeaturedRooms([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       // Fetch only active AND verified/approved listings for public display
       const { data: listingsData, error: listingsError } = await supabase
