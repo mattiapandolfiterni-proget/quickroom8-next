@@ -16,6 +16,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { ImageUpload } from '@/components/ImageUpload';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { z } from 'zod';
+import { NEW_LISTING_DEFAULTS, logApprovalAction } from '@/lib/approval';
 
 const listingSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters').max(200, 'Title too long'),
@@ -284,22 +285,25 @@ const ListRoom = () => {
       bills_included: formData.get('bills') === 'on',
       amenities,
       images,
-      is_active: false,
-      is_verified: false,
+      // APPROVAL WORKFLOW: New listings ALWAYS start as pending
+      // They must be approved by admin before becoming publicly visible
+      ...NEW_LISTING_DEFAULTS,
     };
 
     try {
       if (editId) {
-        // Update existing listing - set to pending approval
+        // Update existing listing - reset to pending approval
+        // APPROVAL WORKFLOW: Edited listings must be re-approved by admin
         const { error: listingError } = await supabase
           .from('room_listings')
           .update({
             ...listing,
-            is_active: false,
-            is_verified: false
+            ...NEW_LISTING_DEFAULTS, // Reset to pending state
           })
           .eq('id', editId)
           .eq('owner_id', user.id);
+        
+        logApprovalAction('create', 'listing', editId, user.id);
 
         if (listingError) throw listingError;
 

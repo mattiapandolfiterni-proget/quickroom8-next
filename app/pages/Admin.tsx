@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/hooks/use-toast';
 import { Users, Home, MessageSquare, Star, TrendingUp, BarChart3, LineChart, PieChart } from 'lucide-react';
 import { LineChart as RechartsLineChart, Line, BarChart as RechartsBarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { logApprovalAction, REVIEW_STATUS } from '@/lib/approval';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -274,6 +275,7 @@ export default function Admin() {
   };
 
   const verifyListing = async (listingId: string, isVerified: boolean) => {
+    // APPROVAL WORKFLOW: Admin approval/rejection of listings
     // Get listing details before updating
     const { data: listing } = await supabase
       .from('room_listings')
@@ -281,11 +283,13 @@ export default function Admin() {
       .eq('id', listingId)
       .single();
 
+    const currentUser = (await supabase.auth.getUser()).data.user;
+
     const { error } = await supabase
       .from('room_listings')
       .update({ 
         is_verified: isVerified,
-        is_active: isVerified // Activate listing when verified
+        is_active: isVerified // Activate listing when verified, deactivate when rejected
       })
       .eq('id', listingId);
 
@@ -296,12 +300,22 @@ export default function Admin() {
         variant: "destructive"
       });
     } else {
-      // Notify listing owner if approved
-      if (isVerified && listing) {
+      // Log the approval action
+      logApprovalAction(
+        isVerified ? 'approve' : 'reject',
+        'listing',
+        listingId,
+        currentUser?.id
+      );
+
+      // Notify listing owner
+      if (listing) {
         await supabase.from('notifications').insert({
           user_id: listing.owner_id,
-          title: 'Listing Approved',
-          content: `Your listing "${listing.title}" has been approved and is now live!`,
+          title: isVerified ? 'Listing Approved' : 'Listing Rejected',
+          content: isVerified 
+            ? `Your listing "${listing.title}" has been approved and is now live!`
+            : `Your listing "${listing.title}" was not approved. Please review our guidelines and resubmit.`,
           type: 'listing',
           link: '/my-listings'
         });
@@ -312,6 +326,7 @@ export default function Admin() {
         description: `Listing ${isVerified ? 'approved and activated' : 'rejected'} successfully`
       });
       loadListings();
+      loadStats();
     }
   };
 
@@ -338,11 +353,14 @@ export default function Admin() {
   };
 
   const updateReviewStatus = async (reviewId: string, status: 'approved' | 'rejected') => {
+    // APPROVAL WORKFLOW: Admin approval/rejection of reviews
     const { data: review } = await supabase
       .from('reviews')
       .select('reviewer_id')
       .eq('id', reviewId)
       .single();
+
+    const currentUser = (await supabase.auth.getUser()).data.user;
 
     const { error } = await supabase
       .from('reviews')
@@ -352,16 +370,25 @@ export default function Admin() {
     if (error) {
       toast({
         title: "Error",
-        description: "Failed to update review status",
+        description: "Failed to update review status. Make sure the 'status' column exists in the reviews table.",
         variant: "destructive"
       });
+      console.error('[Admin] Review status update failed:', error);
     } else {
+      // Log the approval action
+      logApprovalAction(
+        status === REVIEW_STATUS.APPROVED ? 'approve' : 'reject',
+        'review',
+        reviewId,
+        currentUser?.id
+      );
+
       // Notify the reviewer about their review status
       if (review) {
         await supabase.from('notifications').insert({
           user_id: review.reviewer_id,
-          title: status === 'approved' ? 'Review Approved' : 'Review Rejected',
-          content: status === 'approved' 
+          title: status === REVIEW_STATUS.APPROVED ? 'Review Approved' : 'Review Rejected',
+          content: status === REVIEW_STATUS.APPROVED 
             ? 'Your review has been approved and is now visible.'
             : 'Your review did not meet our community guidelines.',
           type: 'review',
@@ -374,6 +401,7 @@ export default function Admin() {
         description: `Review ${status} successfully`
       });
       loadReviews();
+      loadStats();
     }
   };
 

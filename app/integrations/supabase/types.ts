@@ -608,6 +608,7 @@ export type Database = {
           rating: number
           reviewed_id: string
           reviewer_id: string
+          status: string | null  // 'pending' | 'approved' | 'rejected'
         }
         Insert: {
           comment?: string | null
@@ -617,6 +618,7 @@ export type Database = {
           rating: number
           reviewed_id: string
           reviewer_id: string
+          status?: string | null  // Defaults to 'pending'
         }
         Update: {
           comment?: string | null
@@ -626,6 +628,7 @@ export type Database = {
           rating?: number
           reviewed_id?: string
           reviewer_id?: string
+          status?: string | null
         }
         Relationships: [
           {
