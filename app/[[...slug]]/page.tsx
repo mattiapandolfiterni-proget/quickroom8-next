@@ -4,6 +4,7 @@ import dynamicImport from "next/dynamic";
 import { LoadingSpinner } from "@/components/LoadingState";
 
 // Load App.tsx with SSR disabled (required for React Router DOM)
+// This is the SPA entry point - React Router handles all client-side routing
 const App = dynamicImport(() => import("../App"), {
   ssr: false,
   loading: () => (
@@ -41,7 +42,32 @@ const App = dynamicImport(() => import("../App"), {
   ),
 });
 
-// Catch-all route handler - renders the SPA for ALL routes
+/**
+ * CATCH-ALL ROUTE HANDLER
+ * 
+ * This single Next.js page handles ALL routes in the application.
+ * The actual routing is done client-side by React Router DOM in App.tsx.
+ * 
+ * Supported routes (handled by React Router):
+ * - / (Home)
+ * - /browse
+ * - /list-room
+ * - /contact
+ * - /safety-tips
+ * - /privacy-policy
+ * - /terms-of-service
+ * - /auth
+ * - /profile
+ * - /messages
+ * - /favorites
+ * - /my-listings
+ * - /appointments
+ * - /admin
+ * - /room/:id
+ * - etc.
+ * 
+ * @see app/App.tsx for the React Router configuration
+ */
 export default function CatchAllPage() {
   return <App />;
 }
