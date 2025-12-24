@@ -99,10 +99,10 @@ const nextConfig = {
     ];
   },
 
-  // Redirects for SEO (www -> non-www or vice versa)
+  // Redirects for SEO and convenience
   async redirects() {
     return [
-      // Redirect old paths if any
+      // Redirect old/alternative paths
       {
         source: '/rooms',
         destination: '/browse',
@@ -116,6 +116,12 @@ const nextConfig = {
       {
         source: '/login',
         destination: '/auth',
+        permanent: true,
+      },
+      // FIX: Add /safety redirect to /safety-tips for better UX
+      {
+        source: '/safety',
+        destination: '/safety-tips',
         permanent: true,
       },
     ];

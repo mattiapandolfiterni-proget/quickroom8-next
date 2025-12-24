@@ -437,26 +437,59 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 border-t border-border">
+      {/* Footer - FIX: Use React Router Link for SPA navigation on Vercel */}
+      <footer className="py-8 border-t border-border bg-background">
         <div className="container">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-2">
+            {/* Logo */}
+            <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                 <Home className="w-4 h-4 text-white" />
               </div>
               <span className="font-display font-bold text-lg">QuickRoom8</span>
-            </div>
+            </Link>
             
-            <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground">
-              <a href="/browse" className="hover:text-foreground transition-colors">{t('footer.browse')}</a>
-              <a href="/list-room" className="hover:text-foreground transition-colors">{t('footer.listRoom')}</a>
-              <a href="/contact" className="hover:text-foreground transition-colors">{t('footer.contact')}</a>
-              <a href="/safety-tips" className="hover:text-foreground transition-colors">{t('footer.safety')}</a>
-              <a href="/privacy-policy" className="hover:text-foreground transition-colors">{t('footer.privacy')}</a>
-              <a href="/terms-of-service" className="hover:text-foreground transition-colors">{t('footer.terms')}</a>
-            </div>
+            {/* Navigation Links - FIX: Changed from <a> to <Link> for client-side routing */}
+            <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
+              <Link 
+                to="/browse" 
+                className="text-muted-foreground hover:text-foreground transition-colors py-1 touch-manipulation"
+              >
+                {t('footer.browse')}
+              </Link>
+              <Link 
+                to="/list-room" 
+                className="text-muted-foreground hover:text-foreground transition-colors py-1 touch-manipulation"
+              >
+                {t('footer.listRoom')}
+              </Link>
+              <Link 
+                to="/contact" 
+                className="text-muted-foreground hover:text-foreground transition-colors py-1 touch-manipulation"
+              >
+                {t('footer.contact')}
+              </Link>
+              <Link 
+                to="/safety-tips" 
+                className="text-muted-foreground hover:text-foreground transition-colors py-1 touch-manipulation"
+              >
+                {t('footer.safety')}
+              </Link>
+              <Link 
+                to="/privacy-policy" 
+                className="text-muted-foreground hover:text-foreground transition-colors py-1 touch-manipulation"
+              >
+                {t('footer.privacy')}
+              </Link>
+              <Link 
+                to="/terms-of-service" 
+                className="text-muted-foreground hover:text-foreground transition-colors py-1 touch-manipulation"
+              >
+                {t('footer.terms')}
+              </Link>
+            </nav>
             
+            {/* Copyright */}
             <p className="text-sm text-muted-foreground">{t('footer.copyright')}</p>
           </div>
         </div>
