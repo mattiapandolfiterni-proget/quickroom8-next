@@ -16,6 +16,8 @@ import { RequestAppointmentDialog } from '@/components/RequestAppointmentDialog'
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useCompatibilityScore } from '@/hooks/useCompatibilityScore';
+import { PageLoading, Skeleton } from '@/components/LoadingState';
+import { logger } from '@/lib/logger';
 import {
   MapPin, Calendar, BedDouble, Bath, Home, Wifi, Wind, Zap, Car,
   PawPrint, Euro, MessageCircle, Heart, Share2, ChevronLeft, CheckCircle2, AlertTriangle, Plus, Loader2
@@ -27,6 +29,8 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+
+const log = logger.scope('RoomDetails');
 
 const RoomDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -89,7 +93,7 @@ const RoomDetails = () => {
 
       setListing(data);
     } catch (error) {
-      console.error('Error fetching listing:', error);
+      log.error('Error fetching listing', error);
       toast({
         title: "Error",
         description: "Could not load listing details",
@@ -181,7 +185,7 @@ const RoomDetails = () => {
     }
 
     setMessagingLoading(true);
-    console.log('[Message] Starting conversation. User:', user.id, 'Owner:', listing.owner_id, 'Listing:', id);
+    log.debug('Starting conversation', { data: { userId: user.id, ownerId: listing.owner_id, listingId: id } });
 
     try {
       // First, check if a conversation already exists between these users for this listing
@@ -191,7 +195,7 @@ const RoomDetails = () => {
         .eq('user_id', user.id);
 
       if (fetchError) {
-        console.error('[Message] Error fetching conversations:', fetchError);
+        log.error('Error fetching conversations', fetchError);
         throw new Error('Failed to check existing conversations');
       }
 
@@ -222,7 +226,7 @@ const RoomDetails = () => {
       }
 
       if (existingConversationId) {
-        console.log('[Message] Found existing conversation:', existingConversationId);
+        log.debug('Found existing conversation', { data: { conversationId: existingConversationId } });
         toast({
           title: "Opening conversation",
           description: "You already have a conversation with this owner",
@@ -232,7 +236,7 @@ const RoomDetails = () => {
       }
 
       // Create new conversation
-      console.log('[Message] Creating new conversation for listing:', id);
+      log.debug('Creating new conversation', { data: { listingId: id } });
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
         .insert({ listing_id: id })
@@ -240,16 +244,16 @@ const RoomDetails = () => {
         .single();
 
       if (convError) {
-        console.error('[Message] Error creating conversation:', convError);
+        log.error('Error creating conversation', convError);
         throw new Error(convError.message || 'Failed to create conversation');
       }
 
       if (!conversation || !conversation.id) {
-        console.error('[Message] Conversation insert returned no data');
+        log.error('Conversation insert returned no data');
         throw new Error('Conversation was not created - no confirmation received');
       }
 
-      console.log('[Message] Conversation created:', conversation.id);
+      log.debug('Conversation created', { data: { conversationId: conversation.id } });
 
       // Add current user as participant first - with select to verify
       const { data: myParticipant, error: myParticipantError } = await supabase
@@ -259,13 +263,13 @@ const RoomDetails = () => {
         .single();
 
       if (myParticipantError || !myParticipant) {
-        console.error('[Message] Error adding user as participant:', myParticipantError);
+        log.error('Error adding user as participant', myParticipantError);
         // Rollback: delete the conversation
         await supabase.from('conversations').delete().eq('id', conversation.id);
         throw new Error(myParticipantError?.message || 'Failed to join conversation');
       }
 
-      console.log('[Message] Added user as participant:', myParticipant.id);
+      log.debug('Added user as participant', { data: { participantId: myParticipant.id } });
 
       // Add owner as participant - with select to verify
       const { data: ownerParticipant, error: ownerParticipantError } = await supabase
@@ -275,14 +279,14 @@ const RoomDetails = () => {
         .single();
 
       if (ownerParticipantError || !ownerParticipant) {
-        console.error('[Message] Error adding owner as participant:', ownerParticipantError);
+        log.error('Error adding owner as participant', ownerParticipantError);
         // Rollback: delete participants and conversation
         await supabase.from('conversation_participants').delete().eq('conversation_id', conversation.id);
         await supabase.from('conversations').delete().eq('id', conversation.id);
         throw new Error(ownerParticipantError?.message || 'Failed to add owner to conversation');
       }
 
-      console.log('[Message] Added owner as participant:', ownerParticipant.id);
+      log.debug('Added owner as participant', { data: { participantId: ownerParticipant.id } });
 
       // Create notification for the owner (non-blocking but logged)
       const { error: notifError } = await supabase.from('notifications').insert({
@@ -294,10 +298,10 @@ const RoomDetails = () => {
       });
 
       if (notifError) {
-        console.warn('[Message] Notification failed (non-critical):', notifError);
+        log.warn('Notification failed (non-critical)', { data: { error: notifError.message } });
       }
 
-      console.log('[Message] Conversation setup complete. Navigating to messages.');
+      log.info('Conversation setup complete');
 
       toast({
         title: "Conversation started",
@@ -307,7 +311,7 @@ const RoomDetails = () => {
       navigate('/messages');
     } catch (error: any) {
       const errorMessage = error?.message || error?.toString?.() || "Failed to start conversation. Please try again.";
-      console.error('[Message] Error starting conversation:', errorMessage, error);
+      log.error('Error starting conversation', error);
       toast({
         title: "Error",
         description: errorMessage,
@@ -337,7 +341,7 @@ const RoomDetails = () => {
       } catch (error: any) {
         // User cancelled or error occurred
         if (error.name !== 'AbortError') {
-          console.error('Error sharing:', error);
+          log.warn('Error sharing', error);
         }
       }
     } else {
@@ -379,7 +383,7 @@ const RoomDetails = () => {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <div className="container py-12 text-center">Loading...</div>
+        <PageLoading message="Loading room details..." />
       </div>
     );
   }

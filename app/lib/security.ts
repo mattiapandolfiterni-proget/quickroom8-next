@@ -13,6 +13,7 @@
 
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { securityLogger as log } from '@/lib/logger';
 
 // ============================================
 // ERROR TYPES
@@ -78,7 +79,7 @@ export const SECURITY_ERRORS = {
  */
 export function requireAuth(user: User | null): asserts user is User {
   if (!user) {
-    console.warn('[Security] Auth check failed: No user');
+    log.warn('Auth check failed: No user');
     throw SECURITY_ERRORS.NOT_AUTHENTICATED;
   }
 }
@@ -91,7 +92,7 @@ export async function getCurrentUserOrThrow(): Promise<User> {
   const { data: { user }, error } = await supabase.auth.getUser();
   
   if (error || !user) {
-    console.warn('[Security] getCurrentUser failed:', error?.message);
+    log.warn('getCurrentUser failed', { data: { error: error?.message } });
     throw SECURITY_ERRORS.NOT_AUTHENTICATED;
   }
   
@@ -109,10 +110,7 @@ export function requireProfileOwnership(user: User, profileId: string): void {
   requireAuth(user);
   
   if (user.id !== profileId) {
-    console.warn('[Security] Profile ownership check failed:', {
-      userId: user.id,
-      profileId,
-    });
+    log.warn('Profile ownership check failed', { data: { userId: user.id, profileId } });
     throw SECURITY_ERRORS.NOT_OWNER;
   }
 }
@@ -134,16 +132,12 @@ export async function requireListingOwnership(
     .single();
 
   if (error || !data) {
-    console.warn('[Security] Listing not found:', listingId);
+    log.warn('Listing not found', { data: { listingId } });
     throw SECURITY_ERRORS.RESOURCE_NOT_FOUND;
   }
 
   if (data.owner_id !== user.id) {
-    console.warn('[Security] Listing ownership check failed:', {
-      userId: user.id,
-      ownerId: data.owner_id,
-      listingId,
-    });
+    log.warn('Listing ownership check failed', { data: { userId: user.id, listingId } });
     throw SECURITY_ERRORS.NOT_OWNER;
   }
 }
@@ -166,10 +160,7 @@ export async function requireConversationParticipant(
     .single();
 
   if (error || !data) {
-    console.warn('[Security] Conversation participant check failed:', {
-      userId: user.id,
-      conversationId,
-    });
+    log.warn('Conversation participant check failed', { data: { userId: user.id, conversationId } });
     throw SECURITY_ERRORS.NOT_PARTICIPANT;
   }
 }
@@ -191,7 +182,7 @@ export async function requireAppointmentAccess(
     .single();
 
   if (error || !data) {
-    console.warn('[Security] Appointment not found:', appointmentId);
+    log.warn('Appointment not found', { data: { appointmentId } });
     throw SECURITY_ERRORS.RESOURCE_NOT_FOUND;
   }
 
@@ -199,12 +190,7 @@ export async function requireAppointmentAccess(
   const isRequester = data.requester_id === user.id;
 
   if (!isOwner && !isRequester) {
-    console.warn('[Security] Appointment access check failed:', {
-      userId: user.id,
-      ownerId: data.owner_id,
-      requesterId: data.requester_id,
-      appointmentId,
-    });
+    log.warn('Appointment access check failed', { data: { userId: user.id, appointmentId } });
     throw SECURITY_ERRORS.NOT_AUTHORIZED;
   }
 
@@ -232,11 +218,7 @@ export async function requireReviewOwnership(
   }
 
   if (data.reviewer_id !== user.id) {
-    console.warn('[Security] Review ownership check failed:', {
-      userId: user.id,
-      reviewerId: data.reviewer_id,
-      reviewId,
-    });
+    log.warn('Review ownership check failed', { data: { userId: user.id, reviewId } });
     throw SECURITY_ERRORS.NOT_OWNER;
   }
 }
@@ -262,11 +244,7 @@ export async function requireSavedSearchOwnership(
   }
 
   if (data.user_id !== user.id) {
-    console.warn('[Security] Saved search ownership check failed:', {
-      userId: user.id,
-      searchOwnerId: data.user_id,
-      searchId,
-    });
+    log.warn('Saved search ownership check failed', { data: { userId: user.id, searchId } });
     throw SECURITY_ERRORS.NOT_OWNER;
   }
 }
@@ -324,7 +302,7 @@ export async function requireAdmin(user: User): Promise<void> {
   const isAdmin = await isUserAdmin(user.id);
   
   if (!isAdmin) {
-    console.warn('[Security] Admin check failed:', user.id);
+    log.warn('Admin check failed', { data: { userId: user.id } });
     throw SECURITY_ERRORS.NOT_ADMIN;
   }
 }
@@ -351,7 +329,7 @@ export function validateUUID(id: string): void {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   
   if (!id || !uuidRegex.test(id)) {
-    console.warn('[Security] Invalid UUID:', id);
+    log.warn('Invalid UUID provided', { data: { id: id ? id.substring(0, 10) + '...' : 'null' } });
     throw SECURITY_ERRORS.INVALID_ID;
   }
 }
@@ -461,7 +439,7 @@ export function handleSecurityError(error: unknown): {
   }
   
   // Generic error - don't leak internal details
-  console.error('[Security] Unexpected error:', error);
+  log.error('Unexpected security error', error);
   return {
     title: 'Error',
     description: 'An unexpected error occurred. Please try again.',
@@ -500,11 +478,12 @@ export function logSecurityEvent(
   userId: string | null,
   details: Record<string, unknown>
 ): void {
-  console.log('[Security Audit]', {
-    event,
-    userId,
-    timestamp: new Date().toISOString(),
-    ...details,
+  log.info(`Security audit: ${event}`, { 
+    data: { 
+      userId, 
+      timestamp: new Date().toISOString(), 
+      ...details 
+    } 
   });
 }
 

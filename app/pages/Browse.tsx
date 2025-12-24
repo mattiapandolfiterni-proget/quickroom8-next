@@ -16,6 +16,10 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
+import { RoomGridSkeleton } from '@/components/LoadingState';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('Browse');
 
 const Browse = () => {
   const { user } = useAuth();
@@ -59,7 +63,7 @@ const Browse = () => {
         .order('created_at', { ascending: false });
 
       if (listingsError) {
-        console.error('Error fetching listings:', listingsError.message);
+        log.error('Error fetching listings', listingsError);
         throw listingsError;
       }
 
@@ -90,7 +94,7 @@ const Browse = () => {
 
       setListings(sortedListings);
     } catch (error: any) {
-      console.error('Error fetching listings:', error?.message || error);
+      log.error('Failed to fetch listings', error);
       setListings([]);
     } finally {
       setLoading(false);
@@ -332,7 +336,7 @@ const Browse = () => {
             </div>
 
             {loading ? (
-              <div className="text-center py-12">Loading...</div>
+              <RoomGridSkeleton count={6} />
             ) : viewMode === 'grid' ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredListings.map(listing => (

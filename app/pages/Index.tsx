@@ -8,6 +8,10 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { RoomCardSkeleton } from "@/components/LoadingState";
+import { logger } from "@/lib/logger";
+
+const log = logger.scope('Index');
 // Static images from public folder
 const room1 = "/assets/room-1.jpg";
 const room2 = "/assets/room-2.jpg";
@@ -64,7 +68,7 @@ const Index = () => {
         .limit(20);
 
       if (listingsError) {
-        console.error('Error fetching listings:', listingsError.message);
+        log.error('Error fetching featured rooms', listingsError);
         throw listingsError;
       }
 
@@ -111,7 +115,7 @@ const Index = () => {
         setFeaturedRooms(formattedRooms);
       }
     } catch (error: any) {
-      console.error('Error fetching rooms:', error?.message || error);
+      log.error('Failed to fetch featured rooms', error);
       // Still show some content even if fetch fails
       setFeaturedRooms([]);
     } finally {
@@ -287,9 +291,11 @@ const Index = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {loading ? (
-              <div className="col-span-3 text-center py-12 text-muted-foreground">
-                {t('home.featured.loading')}
-              </div>
+              <>
+                <RoomCardSkeleton />
+                <RoomCardSkeleton />
+                <RoomCardSkeleton />
+              </>
             ) : featuredRooms.length > 0 ? (
               featuredRooms.map(room => (
                 <RoomCard key={room.id} {...room} />

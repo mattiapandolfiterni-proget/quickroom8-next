@@ -110,16 +110,23 @@ export const PUBLIC_REVIEW_STATUS = REVIEW_STATUS.APPROVED;
 // LOGGING HELPERS
 // ============================================
 
+/**
+ * Log an approval action for audit purposes
+ * In production, these logs are sanitized to prevent data leakage
+ */
 export function logApprovalAction(
   action: 'create' | 'approve' | 'reject' | 'deactivate',
   entityType: 'listing' | 'review',
   entityId: string,
   adminId?: string
 ) {
-  console.log(`[Approval] ${action.toUpperCase()} ${entityType}:`, {
-    id: entityId,
-    adminId: adminId || 'system',
-    timestamp: new Date().toISOString(),
-  });
+  // Only log in development or with debug enabled
+  if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.info(`[Approval] ${action.toUpperCase()} ${entityType}:`, {
+      id: entityId,
+      adminId: adminId || 'system',
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
 

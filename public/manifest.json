@@ -1,0 +1,28 @@
+{
+  "name": "QuickRoom8 - Find Rooms & Flatmates in Malta",
+  "short_name": "QuickRoom8",
+  "description": "Find your perfect room and flatmate in Malta with AI-powered compatibility matching.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0d9488",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["lifestyle", "business"],
+  "lang": "en",
+  "dir": "ltr"
+}
+
