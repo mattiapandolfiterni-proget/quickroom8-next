@@ -354,11 +354,11 @@ const Browse = () => {
                     key={listing.id}
                     id={listing.id}
                     image={listing.images?.[0] || '/placeholder.svg'}
-                    price={listing.price}
-                    location={listing.location}
+                    price={listing.price || 0}
+                    location={listing.location || 'Malta'}
                     address={listing.address}
                     roomType={listing.room_type}
-                    availableFrom={new Date(listing.available_from).toLocaleDateString()}
+                    availableFrom={listing.available_from ? new Date(listing.available_from).toLocaleDateString() : 'Available Now'}
                     bedrooms={listing.total_bedrooms || 1}
                     bathrooms={listing.total_bathrooms || 1}
                     amenities={listing.amenities || []}

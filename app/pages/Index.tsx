@@ -109,20 +109,35 @@ const Index = () => {
       }).slice(0, 3);
 
       if (sortedListings) {
-        const formattedRooms = sortedListings.map((room: any, index: number) => ({
-          id: room.id,
-          image: roomImages[index] || room1,
-          price: room.price,
-          location: room.location,
-          roomType: room.room_type === 'private' ? 'Private Room' : room.room_type === 'ensuite' ? 'Ensuite Room' : 'Shared Room',
-          availableFrom: new Date(room.available_from).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-          bedrooms: room.total_bedrooms,
-          bathrooms: room.total_bathrooms,
-          amenities: room.amenities || [],
-          compatibilityScore: Math.floor(Math.random() * 30) + 70,
-          featured: true,
-          flatmates: room.flatmates || []
-        }));
+        const formattedRooms = sortedListings.map((room: any, index: number) => {
+          // Safely format date - handle null/undefined/invalid dates
+          let availableFromFormatted = 'Available Now';
+          if (room.available_from) {
+            try {
+              const date = new Date(room.available_from);
+              if (!isNaN(date.getTime())) {
+                availableFromFormatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              }
+            } catch {
+              // Keep default 'Available Now'
+            }
+          }
+
+          return {
+            id: room.id,
+            image: roomImages[index] || room1,
+            price: room.price || 0,
+            location: room.location || 'Malta',
+            roomType: room.room_type === 'private' ? 'Private Room' : room.room_type === 'ensuite' ? 'Ensuite Room' : 'Shared Room',
+            availableFrom: availableFromFormatted,
+            bedrooms: room.total_bedrooms || 1,
+            bathrooms: room.total_bathrooms || 1,
+            amenities: room.amenities || [],
+            compatibilityScore: Math.floor(Math.random() * 30) + 70,
+            featured: true,
+            flatmates: room.flatmates || []
+          };
+        });
         setFeaturedRooms(formattedRooms);
       }
     } catch (error: any) {

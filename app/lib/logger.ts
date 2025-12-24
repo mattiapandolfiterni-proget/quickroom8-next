@@ -70,22 +70,38 @@ class Logger {
     // Extract error message from various error formats
     const getErrorMessage = (err: unknown): string => {
       if (!err) return 'No error details';
-      if (err instanceof Error) return err.message;
+      if (err instanceof Error) return `${err.name}: ${err.message}`;
       if (typeof err === 'string') return err;
       if (typeof err === 'object') {
         const obj = err as Record<string, unknown>;
-        return obj.message as string || 
-               obj.error_description as string || 
-               obj.error as string ||
-               (Object.keys(obj).length === 0 ? 'Empty error object' : JSON.stringify(obj));
+        // Check common error message properties
+        if (obj.message) return String(obj.message);
+        if (obj.error_description) return String(obj.error_description);
+        if (obj.error) return String(obj.error);
+        // Check if it's an empty object
+        const keys = Object.keys(obj);
+        if (keys.length === 0) return 'Empty error object (check network/auth)';
+        // Try to stringify for other objects
+        try {
+          return JSON.stringify(obj);
+        } catch {
+          return `Object with keys: ${keys.join(', ')}`;
+        }
       }
       return String(err);
     };
 
     const errorMsg = getErrorMessage(error);
+    const contextData = options?.data && Object.keys(options.data).length > 0 
+      ? options.data 
+      : undefined;
 
     if (isDevelopment) {
-      console.error(`[${this.prefix}] ${message}:`, errorMsg, options?.data ?? '');
+      if (contextData) {
+        console.error(`[${this.prefix}] ${message}:`, errorMsg, contextData);
+      } else {
+        console.error(`[${this.prefix}] ${message}:`, errorMsg);
+      }
     } else {
       // In production, sanitize error details to prevent data leakage
       console.error(`[${this.prefix}] ${message}: ${errorMsg}`);
