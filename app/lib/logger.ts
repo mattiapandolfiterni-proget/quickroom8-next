@@ -67,12 +67,28 @@ class Logger {
    * Error logs - always logged but sanitized in production
    */
   error(message: string, error?: unknown, options?: LogOptions): void {
+    // Extract error message from various error formats
+    const getErrorMessage = (err: unknown): string => {
+      if (!err) return 'No error details';
+      if (err instanceof Error) return err.message;
+      if (typeof err === 'string') return err;
+      if (typeof err === 'object') {
+        const obj = err as Record<string, unknown>;
+        return obj.message as string || 
+               obj.error_description as string || 
+               obj.error as string ||
+               (Object.keys(obj).length === 0 ? 'Empty error object' : JSON.stringify(obj));
+      }
+      return String(err);
+    };
+
+    const errorMsg = getErrorMessage(error);
+
     if (isDevelopment) {
-      console.error(`[${this.prefix}] ${message}`, error, options?.data ?? '');
+      console.error(`[${this.prefix}] ${message}:`, errorMsg, options?.data ?? '');
     } else {
       // In production, sanitize error details to prevent data leakage
-      const safeError = error instanceof Error ? error.message : 'An error occurred';
-      console.error(`[${this.prefix}] ${message}: ${safeError}`);
+      console.error(`[${this.prefix}] ${message}: ${errorMsg}`);
     }
   }
 

@@ -63,8 +63,15 @@ const Browse = () => {
         .order('created_at', { ascending: false });
 
       if (listingsError) {
-        log.error('Error fetching listings', listingsError);
+        log.error('Error fetching listings', listingsError, {
+          data: { code: listingsError.code, hint: listingsError.hint }
+        });
         throw listingsError;
+      }
+
+      // Debug: Log if no listings found
+      if (!listingsData || listingsData.length === 0) {
+        log.debug('No approved listings found');
       }
 
       // Fetch active boosts (non-critical, don't fail if this errors)
@@ -94,7 +101,10 @@ const Browse = () => {
 
       setListings(sortedListings);
     } catch (error: any) {
-      log.error('Failed to fetch listings', error);
+      const errorMessage = error?.message || error?.error_description || 'Unknown error';
+      log.error('Failed to fetch listings', new Error(errorMessage), {
+        data: { code: error?.code, hint: error?.hint }
+      });
       setListings([]);
     } finally {
       setLoading(false);

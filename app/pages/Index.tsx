@@ -68,8 +68,19 @@ const Index = () => {
         .limit(20);
 
       if (listingsError) {
-        log.error('Error fetching featured rooms', listingsError);
+        log.error('Error fetching featured rooms', listingsError, {
+          data: { 
+            code: listingsError.code, 
+            hint: listingsError.hint,
+            details: listingsError.details 
+          }
+        });
         throw listingsError;
+      }
+
+      // Debug: Log if no listings found (not an error, but useful for debugging)
+      if (!listingsData || listingsData.length === 0) {
+        log.debug('No approved listings found - this is normal if none exist yet');
       }
 
       // Fetch active boosts (non-critical, don't fail if this errors)
@@ -115,7 +126,16 @@ const Index = () => {
         setFeaturedRooms(formattedRooms);
       }
     } catch (error: any) {
-      log.error('Failed to fetch featured rooms', error);
+      // Extract meaningful error message
+      const errorMessage = error?.message || error?.error_description || 
+                           (typeof error === 'string' ? error : 'Unknown error');
+      log.error('Failed to fetch featured rooms', new Error(errorMessage), {
+        data: { 
+          code: error?.code,
+          hint: error?.hint,
+          details: error?.details 
+        }
+      });
       // Still show some content even if fetch fails
       setFeaturedRooms([]);
     } finally {
