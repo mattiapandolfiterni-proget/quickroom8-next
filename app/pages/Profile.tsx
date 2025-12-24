@@ -154,36 +154,46 @@ const Profile = () => {
         preferred_room_type: getString('preferred_room_type'),
         preferred_locations: getArray('preferred_locations'),
         must_have_amenities: getArray('must_have_amenities'),
-        updated_at: new Date().toISOString(),
+        // Let DB handle updated_at with default/trigger, or remove if not auto-managed
       };
 
-      // Use UPDATE instead of UPSERT to ensure all fields are updated
+      console.log('[Profile] Updating profile for user:', user.id);
+      console.log('[Profile] Update payload:', JSON.stringify(updates, null, 2));
+
+      // Use UPDATE with explicit select to get the persisted data back
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
         .eq('id', user.id)
-        .select()
+        .select('*')
         .single();
 
       if (error) {
-        console.error('Profile update error:', error);
-        throw error;
+        console.error('[Profile] Update error:', error);
+        throw new Error(error.message || 'Database update failed');
       }
 
-      // Update local state with the returned data
-      if (data) {
-        setProfile(data);
+      // CRITICAL: Verify data was actually returned
+      if (!data) {
+        console.error('[Profile] No data returned after update');
+        throw new Error('Profile update completed but no data returned. Please refresh the page.');
       }
+
+      console.log('[Profile] Update successful, returned data:', data.id);
+
+      // Update local state with the DB-confirmed data (source of truth)
+      setProfile(data);
 
       toast({
         title: "Profile updated",
-        description: "Your profile has been updated successfully.",
+        description: "Your profile has been saved successfully.",
       });
     } catch (error: any) {
-      console.error('Profile save error:', error);
+      const errorMessage = error?.message || error?.toString?.() || "Failed to update profile";
+      console.error('[Profile] Save error:', errorMessage, error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to update profile",
+        title: "Error Saving Profile",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

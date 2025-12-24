@@ -181,6 +181,7 @@ const RoomDetails = () => {
     }
 
     setMessagingLoading(true);
+    console.log('[Message] Starting conversation. User:', user.id, 'Owner:', listing.owner_id, 'Listing:', id);
 
     try {
       // First, check if a conversation already exists between these users for this listing
@@ -190,7 +191,7 @@ const RoomDetails = () => {
         .eq('user_id', user.id);
 
       if (fetchError) {
-        console.error('Error fetching conversations:', fetchError);
+        console.error('[Message] Error fetching conversations:', fetchError);
         throw new Error('Failed to check existing conversations');
       }
 
@@ -221,7 +222,7 @@ const RoomDetails = () => {
       }
 
       if (existingConversationId) {
-        // Conversation already exists, navigate to messages
+        console.log('[Message] Found existing conversation:', existingConversationId);
         toast({
           title: "Opening conversation",
           description: "You already have a conversation with this owner",
@@ -231,56 +232,72 @@ const RoomDetails = () => {
       }
 
       // Create new conversation
+      console.log('[Message] Creating new conversation for listing:', id);
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
         .insert({ listing_id: id })
-        .select()
+        .select('*')
         .single();
 
       if (convError) {
-        console.error('Error creating conversation:', convError);
+        console.error('[Message] Error creating conversation:', convError);
         throw new Error(convError.message || 'Failed to create conversation');
       }
 
-      if (!conversation) {
-        throw new Error('Conversation was not created');
+      if (!conversation || !conversation.id) {
+        console.error('[Message] Conversation insert returned no data');
+        throw new Error('Conversation was not created - no confirmation received');
       }
 
-      // Add current user as participant first
-      const { error: myParticipantError } = await supabase
-        .from('conversation_participants')
-        .insert({ conversation_id: conversation.id, user_id: user.id });
+      console.log('[Message] Conversation created:', conversation.id);
 
-      if (myParticipantError) {
-        console.error('Error adding user as participant:', myParticipantError);
+      // Add current user as participant first - with select to verify
+      const { data: myParticipant, error: myParticipantError } = await supabase
+        .from('conversation_participants')
+        .insert({ conversation_id: conversation.id, user_id: user.id })
+        .select('*')
+        .single();
+
+      if (myParticipantError || !myParticipant) {
+        console.error('[Message] Error adding user as participant:', myParticipantError);
         // Rollback: delete the conversation
         await supabase.from('conversations').delete().eq('id', conversation.id);
-        throw new Error(myParticipantError.message || 'Failed to join conversation');
+        throw new Error(myParticipantError?.message || 'Failed to join conversation');
       }
 
-      // Add owner as participant
-      const { error: ownerParticipantError } = await supabase
-        .from('conversation_participants')
-        .insert({ conversation_id: conversation.id, user_id: listing.owner_id });
+      console.log('[Message] Added user as participant:', myParticipant.id);
 
-      if (ownerParticipantError) {
-        console.error('Error adding owner as participant:', ownerParticipantError);
+      // Add owner as participant - with select to verify
+      const { data: ownerParticipant, error: ownerParticipantError } = await supabase
+        .from('conversation_participants')
+        .insert({ conversation_id: conversation.id, user_id: listing.owner_id })
+        .select('*')
+        .single();
+
+      if (ownerParticipantError || !ownerParticipant) {
+        console.error('[Message] Error adding owner as participant:', ownerParticipantError);
         // Rollback: delete participants and conversation
         await supabase.from('conversation_participants').delete().eq('conversation_id', conversation.id);
         await supabase.from('conversations').delete().eq('id', conversation.id);
-        throw new Error(ownerParticipantError.message || 'Failed to add owner to conversation');
+        throw new Error(ownerParticipantError?.message || 'Failed to add owner to conversation');
       }
 
-      // Create notification for the owner (non-blocking)
-      supabase.from('notifications').insert({
+      console.log('[Message] Added owner as participant:', ownerParticipant.id);
+
+      // Create notification for the owner (non-blocking but logged)
+      const { error: notifError } = await supabase.from('notifications').insert({
         user_id: listing.owner_id,
         title: 'New Message',
         content: `Someone is interested in your listing: ${listing.title}`,
         type: 'message',
         link: '/messages'
-      }).then(({ error }) => {
-        if (error) console.error('Failed to send notification:', error);
       });
+
+      if (notifError) {
+        console.warn('[Message] Notification failed (non-critical):', notifError);
+      }
+
+      console.log('[Message] Conversation setup complete. Navigating to messages.');
 
       toast({
         title: "Conversation started",
@@ -289,10 +306,11 @@ const RoomDetails = () => {
       
       navigate('/messages');
     } catch (error: any) {
-      console.error('Error starting conversation:', error);
+      const errorMessage = error?.message || error?.toString?.() || "Failed to start conversation. Please try again.";
+      console.error('[Message] Error starting conversation:', errorMessage, error);
       toast({
         title: "Error",
-        description: error.message || "Failed to start conversation. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

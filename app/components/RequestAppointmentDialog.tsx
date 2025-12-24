@@ -69,21 +69,38 @@ export const RequestAppointmentDialog = ({ listingId, ownerId }: RequestAppointm
         return;
       }
 
-      // Insert appointment with explicit status field
-      const { data, error } = await supabase.from('viewing_appointments').insert({
+      const appointmentPayload = {
         listing_id: listingId,
         owner_id: ownerId,
         requester_id: user.id,
         appointment_date: appointmentDate.toISOString(),
         notes: notes.trim() || null,
         status: 'pending', // Explicitly set status
-      }).select().single();
+      };
+
+      console.log('[Appointment] Creating appointment:', JSON.stringify(appointmentPayload, null, 2));
+
+      // Insert appointment with explicit status field and verify return
+      const { data, error } = await supabase
+        .from('viewing_appointments')
+        .insert(appointmentPayload)
+        .select('*')
+        .single();
 
       if (error) {
+        console.error('[Appointment] Insert error:', error);
         throw new Error(error.message || 'Failed to create appointment');
       }
 
-      // Create notification for owner
+      // CRITICAL: Verify the appointment was actually created
+      if (!data || !data.id) {
+        console.error('[Appointment] No data returned after insert');
+        throw new Error('Appointment creation failed - no confirmation received');
+      }
+
+      console.log('[Appointment] Created successfully with ID:', data.id);
+
+      // Create notification for owner (non-blocking but logged)
       const { error: notifError } = await supabase.from('notifications').insert({
         user_id: ownerId,
         title: 'New Viewing Request',
@@ -92,11 +109,13 @@ export const RequestAppointmentDialog = ({ listingId, ownerId }: RequestAppointm
         link: '/appointments'
       });
 
-      // Don't fail the appointment creation for notification failure
+      if (notifError) {
+        console.warn('[Appointment] Notification failed (non-critical):', notifError);
+      }
 
       toast({
         title: "Request Sent!",
-        description: `Your viewing request for ${format(appointmentDate, 'PPP')} has been sent`,
+        description: `Your viewing request for ${format(appointmentDate, 'PPP')} has been sent. ID: ${data.id.slice(0, 8)}`,
       });
 
       setOpen(false);
@@ -104,9 +123,11 @@ export const RequestAppointmentDialog = ({ listingId, ownerId }: RequestAppointm
       setTime('10:00');
       setNotes('');
     } catch (error: any) {
+      const errorMessage = error?.message || error?.toString?.() || "Please try again later";
+      console.error('[Appointment] Request failed:', errorMessage, error);
       toast({
         title: "Failed to Request Viewing",
-        description: error.message || "Please try again later",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

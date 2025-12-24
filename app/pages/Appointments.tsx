@@ -137,17 +137,37 @@ export default function Appointments() {
     }
   }, [user, fetchAppointments]);
 
-  const updateAppointmentStatus = async (id: string, status: string) => {
-    const { error } = await supabase
-      .from('viewing_appointments')
-      .update({ status })
-      .eq('id', id);
+  const updateAppointmentStatus = async (appointmentId: string, status: string) => {
+    console.log('[Appointments] Updating status:', appointmentId, 'to', status);
+    
+    try {
+      const { data, error } = await supabase
+        .from('viewing_appointments')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', appointmentId)
+        .select('*')
+        .single();
 
-    if (error) {
-      toast.error('Failed to update appointment');
-    } else {
+      if (error) {
+        console.error('[Appointments] Update error:', error);
+        toast.error(error.message || 'Failed to update appointment');
+        return;
+      }
+
+      // CRITICAL: Verify update was persisted
+      if (!data || data.status !== status) {
+        console.error('[Appointments] Update verification failed. Expected:', status, 'Got:', data?.status);
+        toast.error('Appointment update may not have been saved. Please refresh.');
+        return;
+      }
+
+      console.log('[Appointments] Status updated successfully:', data.id, data.status);
       toast.success(`Appointment ${status}`);
       fetchAppointments();
+    } catch (error: any) {
+      const errorMessage = error?.message || error?.toString?.() || 'Failed to update appointment';
+      console.error('[Appointments] Update exception:', errorMessage, error);
+      toast.error(errorMessage);
     }
   };
 

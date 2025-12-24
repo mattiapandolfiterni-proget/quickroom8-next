@@ -182,21 +182,25 @@ const Messages = () => {
     if (!newMessage.trim() || !selectedConversation) return;
 
     const messageContent = newMessage.trim();
-    setNewMessage(''); // Clear immediately for better UX
+    // Store message content but DON'T clear until DB confirms
+    
+    console.log('[SendMessage] Sending message to conversation:', selectedConversation);
 
     try {
-      const { error } = await supabase
+      // Insert message with select to verify persistence
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           conversation_id: selectedConversation,
           sender_id: user.id,
           content: messageContent,
           message_type: 'text'
-        });
+        })
+        .select('*')
+        .single();
 
       if (error) {
-        console.error('Error sending message:', error);
-        setNewMessage(messageContent); // Restore message on error
+        console.error('[SendMessage] Insert error:', error);
         toast({
           title: "Error",
           description: error.message || "Failed to send message",
@@ -205,19 +209,39 @@ const Messages = () => {
         return;
       }
 
-      // Update conversation's updated_at timestamp
-      await supabase
+      // CRITICAL: Verify message was actually persisted
+      if (!data || !data.id) {
+        console.error('[SendMessage] No data returned after insert');
+        toast({
+          title: "Error",
+          description: "Message may not have been saved. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('[SendMessage] Message saved with ID:', data.id);
+
+      // Only clear after DB confirms
+      setNewMessage('');
+
+      // Update conversation's updated_at timestamp (non-blocking but logged)
+      const { error: updateError } = await supabase
         .from('conversations')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', selectedConversation);
 
+      if (updateError) {
+        console.warn('[SendMessage] Failed to update conversation timestamp (non-critical):', updateError);
+      }
+
       handleTyping(false);
     } catch (error: any) {
-      console.error('Error sending message:', error);
-      setNewMessage(messageContent); // Restore message on error
+      const errorMessage = error?.message || error?.toString?.() || "Failed to send message. Please try again.";
+      console.error('[SendMessage] Error:', errorMessage, error);
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
