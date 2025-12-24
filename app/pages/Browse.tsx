@@ -7,7 +7,8 @@ import SEO from '@/components/SEO';
 import { SaveSearchDialog } from '@/components/SaveSearchDialog';
 import { SavedSearches } from '@/components/SavedSearches';
 import Map from '@/components/Map';
-import { Search, Filter, SlidersHorizontal, LayoutGrid, MapIcon, Plus } from 'lucide-react';
+import { Search, Filter, SlidersHorizontal, LayoutGrid, MapIcon, Plus, Home } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -356,30 +357,71 @@ const Browse = () => {
             {loading ? (
               <RoomGridSkeleton count={6} />
             ) : viewMode === 'grid' ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredListings.map(listing => (
-                  <RoomCard
-                    key={listing.id}
-                    id={listing.id}
-                    image={listing.images?.[0] || '/placeholder.svg'}
-                    price={listing.price || 0}
-                    location={listing.location || 'Malta'}
-                    address={listing.address}
-                    roomType={listing.room_type}
-                    availableFrom={listing.available_from ? new Date(listing.available_from).toLocaleDateString() : 'Available Now'}
-                    bedrooms={listing.total_bedrooms || 1}
-                    bathrooms={listing.total_bathrooms || 1}
-                    amenities={listing.amenities || []}
-                    flatmates={listing.flatmates?.map((f: any) => ({
-                      name: f.name || 'Anonymous',
-                      age: f.age || 25,
-                      nationality: f.nationality || 'Unknown',
-                      occupation: f.occupation || 'Professional',
-                      traits: f.traits || []
-                    })) || []}
-                  />
-                ))}
-              </div>
+              filteredListings.length > 0 ? (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredListings.map(listing => (
+                    <RoomCard
+                      key={listing.id}
+                      id={listing.id}
+                      image={listing.images?.[0] || '/placeholder.svg'}
+                      price={listing.price || 0}
+                      location={listing.location || 'Malta'}
+                      address={listing.address}
+                      roomType={listing.room_type}
+                      availableFrom={listing.available_from ? new Date(listing.available_from).toLocaleDateString() : 'Available Now'}
+                      bedrooms={listing.total_bedrooms || 1}
+                      bathrooms={listing.total_bathrooms || 1}
+                      amenities={listing.amenities || []}
+                      flatmates={listing.flatmates?.map((f: any) => ({
+                        name: f.name || 'Anonymous',
+                        age: f.age || 25,
+                        nationality: f.nationality || 'Unknown',
+                        occupation: f.occupation || 'Professional',
+                        traits: f.traits || []
+                      })) || []}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16 px-4">
+                  <div className="max-w-md mx-auto space-y-4">
+                    <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+                      <Home className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">No listings available</h3>
+                    <p className="text-muted-foreground">
+                      {listings.length === 0 
+                        ? "No rooms have been listed yet. Be the first to add your property!"
+                        : "No listings match your current filters. Try adjusting your search criteria."
+                      }
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <Button asChild>
+                        <Link to="/list-room">
+                          <Plus className="w-4 h-4 mr-2" />
+                          List Your Room
+                        </Link>
+                      </Button>
+                      {listings.length > 0 && (
+                        <Button 
+                          variant="outline"
+                          onClick={() => {
+                            setPriceRange([0, 2000]);
+                            setRoomType('all');
+                            setSearchQuery('');
+                            setHasPrivateBathroom('all');
+                            setIsFurnished('all');
+                            setIsPetFriendly('all');
+                            setBillsIncluded('all');
+                          }}
+                        >
+                          Clear Filters
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
             ) : (
               <div className="h-[600px] rounded-lg overflow-hidden border border-border shadow-lg">
                 <Map

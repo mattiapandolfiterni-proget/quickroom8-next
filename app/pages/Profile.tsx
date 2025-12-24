@@ -69,13 +69,36 @@ const Profile = () => {
         .eq('id', user.id)
         .single();
 
+      // Handle case where profile doesn't exist (PGRST116 = not found)
+      if (error && error.code === 'PGRST116') {
+        // Profile doesn't exist, create one
+        console.log('[Profile] No profile found, creating one...');
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({ 
+            id: user.id, 
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
+          })
+          .select('*')
+          .single();
+
+        if (createError) {
+          console.error('[Profile] Failed to create profile:', createError);
+          throw createError;
+        }
+        
+        setProfile(newProfile);
+        return;
+      }
+
       if (error) throw error;
       setProfile(data);
     } catch (error) {
       console.error('Error fetching profile:', error);
       toast({
         title: "Error",
-        description: "Failed to load profile data",
+        description: "Failed to load profile data. Please try again.",
         variant: "destructive",
       });
     } finally {

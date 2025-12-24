@@ -344,8 +344,19 @@ const Index = () => {
                 <RoomCard key={room.id} {...room} />
               ))
             ) : (
-              <div className="col-span-3 text-center py-12 text-muted-foreground">
-                {t('home.featured.noRooms')}
+              <div className="col-span-3 text-center py-16 px-4">
+                <div className="max-w-md mx-auto space-y-4">
+                  <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+                    <Home className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground">No listings available yet</h3>
+                  <p className="text-muted-foreground">
+                    Be the first to list your room! Our platform is growing and we'd love to feature your property.
+                  </p>
+                  <Button asChild className="mt-4">
+                    <Link to="/list-room">List Your Room</Link>
+                  </Button>
+                </div>
               </div>
             )}
           </div>
