@@ -1,6 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface MapProps {
@@ -17,12 +15,35 @@ interface MapProps {
   onMarkerClick?: (listingId: string) => void;
 }
 
+// FIX: Dynamic import mapbox-gl to prevent SSR issues on Vercel
+// This library uses browser-only APIs that fail during build/SSR
 const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerClick }: MapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [mapboxToken, setMapboxToken] = useState<string>('');
   const markers = useRef<mapboxgl.Marker[]>([]);
+  const [mapboxToken, setMapboxToken] = useState<string>('');
+  const [mapboxLoaded, setMapboxLoaded] = useState(false);
+  const [mapboxgl, setMapboxgl] = useState<typeof import('mapbox-gl') | null>(null);
 
+  // Load mapbox-gl dynamically on client side only
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const loadMapbox = async () => {
+      try {
+        const mb = await import('mapbox-gl');
+        await import('mapbox-gl/dist/mapbox-gl.css');
+        setMapboxgl(mb.default as unknown as typeof import('mapbox-gl'));
+        setMapboxLoaded(true);
+      } catch (error) {
+        console.error('Failed to load mapbox-gl:', error);
+      }
+    };
+    
+    loadMapbox();
+  }, []);
+
+  // Fetch Mapbox token from Supabase Edge Function
   useEffect(() => {
     const fetchToken = async (retryCount = 0) => {
       try {
@@ -55,15 +76,16 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
     fetchToken();
   }, []);
 
+  // Initialize map when both mapbox and token are ready
   useEffect(() => {
-    if (!mapContainer.current || !mapboxToken) {
+    if (!mapContainer.current || !mapboxToken || !mapboxLoaded || !mapboxgl) {
       return;
     }
 
     try {
-      mapboxgl.accessToken = mapboxToken;
+      (mapboxgl as any).accessToken = mapboxToken;
       
-      map.current = new mapboxgl.Map({
+      map.current = new (mapboxgl as any).Map({
         container: mapContainer.current,
         style: 'mapbox://styles/mapbox/streets-v12',
         center: center,
@@ -74,7 +96,7 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
       map.current.scrollZoom.disable();
       
       // Enable scroll zoom only when Ctrl/Cmd key is pressed
-      map.current.on('wheel', (e) => {
+      map.current.on('wheel', (e: any) => {
         if (e.originalEvent.ctrlKey || e.originalEvent.metaKey) {
           e.originalEvent.preventDefault();
           map.current?.scrollZoom.enable();
@@ -82,7 +104,7 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
       });
 
       map.current.addControl(
-        new mapboxgl.NavigationControl({
+        new (mapboxgl as any).NavigationControl({
           visualizePitch: true,
         }),
         'top-right'
@@ -96,10 +118,11 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
         map.current.remove();
       }
     };
-  }, [mapboxToken, center, zoom]);
+  }, [mapboxToken, mapboxLoaded, mapboxgl, center, zoom]);
 
+  // Update markers when listings change
   useEffect(() => {
-    if (!map.current) return;
+    if (!map.current || !mapboxgl) return;
 
     // Clear existing markers
     markers.current.forEach(marker => marker.remove());
@@ -112,7 +135,7 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
         el.className = 'marker-price-badge';
         el.textContent = '€' + Math.round(listing.price);
         
-        const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
+        const popup = new (mapboxgl as any).Popup({ offset: 25 }).setHTML(
           `<div class="p-3 min-w-[200px]">
             <h3 class="font-semibold text-base mb-2">${listing.title}</h3>
             <p class="text-sm text-gray-600 mb-1">${listing.location}</p>
@@ -120,7 +143,7 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
           </div>`
         );
 
-        const marker = new mapboxgl.Marker(el)
+        const marker = new (mapboxgl as any).Marker(el)
           .setLngLat([listing.longitude, listing.latitude])
           .setPopup(popup)
           .addTo(map.current!);
@@ -135,7 +158,7 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
 
     // Fit bounds to show all markers if there are any
     if (listings.length > 0 && listings.some(l => l.latitude && l.longitude)) {
-      const bounds = new mapboxgl.LngLatBounds();
+      const bounds = new (mapboxgl as any).LngLatBounds();
       listings.forEach(listing => {
         if (listing.latitude && listing.longitude) {
           bounds.extend([listing.longitude, listing.latitude]);
@@ -143,9 +166,10 @@ const Map = ({ listings = [], center = [14.5146, 35.8989], zoom = 11, onMarkerCl
       });
       map.current.fitBounds(bounds, { padding: 50, maxZoom: 14 });
     }
-  }, [listings, onMarkerClick]);
+  }, [listings, onMarkerClick, mapboxgl]);
 
-  if (!mapboxToken) {
+  // Show loading state while mapbox or token is loading
+  if (!mapboxToken || !mapboxLoaded) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-muted/50 rounded-lg p-8 space-y-4">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>

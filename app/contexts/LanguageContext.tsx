@@ -727,21 +727,31 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Leggi localStorage SOLO dopo il mount (client-side)
   // This is a known hydration pattern - setState in effect is intentional here
+  // FIX: Add typeof window check for production safety
   useEffect(() => {
-    const saved = localStorage.getItem('language');
-    const validLanguages: Language[] = ['en', 'mt', 'fr', 'es', 'it', 'de', 'ru'];
-    if (saved && validLanguages.includes(saved as Language)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLanguageState(saved as Language);
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const saved = localStorage.getItem('language');
+      const validLanguages: Language[] = ['en', 'mt', 'fr', 'es', 'it', 'de', 'ru'];
+      if (saved && validLanguages.includes(saved as Language)) {
+        setLanguageState(saved as Language);
+      }
+    } catch {
+      // localStorage might be unavailable in some environments
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsHydrated(true);
   }, []);
 
   // Salva in localStorage quando cambia la lingua (solo se hydrated)
+  // FIX: Add typeof window check for production safety
   useEffect(() => {
-    if (isHydrated) {
+    if (typeof window === 'undefined' || !isHydrated) return;
+    
+    try {
       localStorage.setItem('language', language);
+    } catch {
+      // localStorage might be unavailable in some environments
     }
   }, [language, isHydrated]);
 
