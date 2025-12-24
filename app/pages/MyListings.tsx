@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { logSecurityEvent } from '@/lib/security';
 
 const MyListings = () => {
   const { user } = useAuth();
@@ -118,12 +119,22 @@ const MyListings = () => {
 
   const toggleActive = async (id: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
+      // SECURITY: Enforce ownership - users can only toggle their own listings
+      const { data, error } = await supabase
         .from('room_listings')
         .update({ is_active: !currentStatus })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('owner_id', user.id) // CRITICAL: Ownership check
+        .select('id')
+        .single();
 
       if (error) throw error;
+      
+      // SECURITY: Verify update actually happened
+      if (!data) {
+        logSecurityEvent('LISTING_TOGGLE_UNAUTHORIZED', user.id, { listingId: id });
+        throw new Error('Listing not found or you do not have permission');
+      }
 
       toast({
         title: 'Success',
@@ -143,12 +154,30 @@ const MyListings = () => {
     if (!deleteId) return;
 
     try {
+      // SECURITY: Enforce ownership - users can only delete their own listings
+      // First verify ownership to provide clear error message
+      const { data: listing, error: fetchError } = await supabase
+        .from('room_listings')
+        .select('id, owner_id')
+        .eq('id', deleteId)
+        .eq('owner_id', user.id) // CRITICAL: Ownership check
+        .single();
+
+      if (fetchError || !listing) {
+        logSecurityEvent('LISTING_DELETE_UNAUTHORIZED', user.id, { listingId: deleteId });
+        throw new Error('Listing not found or you do not have permission to delete it');
+      }
+
+      // Now delete with ownership verification (defense in depth)
       const { error } = await supabase
         .from('room_listings')
         .delete()
-        .eq('id', deleteId);
+        .eq('id', deleteId)
+        .eq('owner_id', user.id); // CRITICAL: Double-check ownership on delete
 
       if (error) throw error;
+
+      logSecurityEvent('LISTING_DELETED', user.id, { listingId: deleteId });
 
       toast({
         title: 'Success',

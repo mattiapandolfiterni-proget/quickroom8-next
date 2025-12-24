@@ -17,6 +17,7 @@ import { ImageUpload } from '@/components/ImageUpload';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { z } from 'zod';
 import { NEW_LISTING_DEFAULTS, logApprovalAction } from '@/lib/approval';
+import { requireAuth, requireListingOwnership, handleSecurityError, logSecurityEvent } from '@/lib/security';
 
 const listingSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters').max(200, 'Title too long'),
@@ -292,20 +293,38 @@ const ListRoom = () => {
 
     try {
       if (editId) {
+        // SECURITY: Verify ownership BEFORE any modifications
+        // This prevents ID spoofing attacks where user manipulates editId
+        try {
+          await requireListingOwnership(user, editId);
+        } catch (securityError) {
+          logSecurityEvent('LISTING_EDIT_UNAUTHORIZED', user.id, { editId });
+          const toastData = handleSecurityError(securityError);
+          toast(toastData);
+          setLoading(false);
+          return;
+        }
+
         // Update existing listing - reset to pending approval
         // APPROVAL WORKFLOW: Edited listings must be re-approved by admin
-        const { error: listingError } = await supabase
+        const { data: updatedListing, error: listingError } = await supabase
           .from('room_listings')
           .update({
             ...listing,
             ...NEW_LISTING_DEFAULTS, // Reset to pending state
           })
           .eq('id', editId)
-          .eq('owner_id', user.id);
+          .eq('owner_id', user.id)
+          .select('*')
+          .single();
         
         logApprovalAction('create', 'listing', editId, user.id);
 
-        if (listingError) throw listingError;
+        // SECURITY: Verify update actually happened (defense in depth)
+        if (listingError || !updatedListing) {
+          logSecurityEvent('LISTING_UPDATE_FAILED', user.id, { editId, error: listingError });
+          throw new Error(listingError?.message || 'Failed to update listing');
+        }
 
         // Geocode address to get coordinates
         if (listing.address) {

@@ -10,6 +10,7 @@ import { MessageSquare, Send, Paperclip, Image as ImageIcon, FileText } from 'lu
 import { Navigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { toast } from '@/hooks/use-toast';
+import { requireConversationParticipant, handleSecurityError, logSecurityEvent } from '@/lib/security';
 
 const Messages = () => {
   const { user } = useAuth();
@@ -187,6 +188,17 @@ const Messages = () => {
     console.log('[SendMessage] Sending message to conversation:', selectedConversation);
 
     try {
+      // SECURITY: Verify user is a participant before sending
+      // This prevents ID spoofing where user manipulates conversation ID
+      try {
+        await requireConversationParticipant(user, selectedConversation);
+      } catch (securityError) {
+        logSecurityEvent('MESSAGE_SEND_UNAUTHORIZED', user.id, { conversationId: selectedConversation });
+        const toastData = handleSecurityError(securityError);
+        toast(toastData);
+        return;
+      }
+
       // Insert message with select to verify persistence
       const { data, error } = await supabase
         .from('messages')
@@ -268,6 +280,16 @@ const Messages = () => {
 
     setUploadingFile(true);
     try {
+      // SECURITY: Verify user is a participant before uploading
+      try {
+        await requireConversationParticipant(user, selectedConversation);
+      } catch (securityError) {
+        logSecurityEvent('FILE_UPLOAD_UNAUTHORIZED', user.id, { conversationId: selectedConversation });
+        const toastData = handleSecurityError(securityError);
+        toast(toastData);
+        return;
+      }
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `chat-files/${fileName}`;

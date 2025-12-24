@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { requireAppointmentAccess, logSecurityEvent } from '@/lib/security';
 
 interface Appointment {
   id: string;
@@ -141,12 +142,44 @@ export default function Appointments() {
     console.log('[Appointments] Updating status:', appointmentId, 'to', status);
     
     try {
-      const { data, error } = await supabase
+      // SECURITY: Verify user has access to this appointment
+      // Business rules:
+      // - Owner can: confirm, cancel, complete
+      // - Requester can: cancel only
+      let accessInfo: { isOwner: boolean; isRequester: boolean };
+      try {
+        accessInfo = await requireAppointmentAccess(user!, appointmentId);
+      } catch (securityError) {
+        logSecurityEvent('APPOINTMENT_UPDATE_UNAUTHORIZED', user!.id, { appointmentId, attemptedStatus: status });
+        toast.error('You do not have permission to update this appointment');
+        return;
+      }
+
+      // SECURITY: Enforce business rules - requesters can only cancel
+      if (accessInfo.isRequester && !accessInfo.isOwner && status !== 'cancelled') {
+        logSecurityEvent('APPOINTMENT_UPDATE_FORBIDDEN', user!.id, { 
+          appointmentId, 
+          attemptedStatus: status, 
+          reason: 'Requester can only cancel' 
+        });
+        toast.error('You can only cancel appointments you requested');
+        return;
+      }
+
+      // Build the filter based on role for defense in depth
+      let query = supabase
         .from('viewing_appointments')
         .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', appointmentId)
-        .select('*')
-        .single();
+        .eq('id', appointmentId);
+      
+      // Add ownership check to query
+      if (accessInfo.isOwner) {
+        query = query.eq('owner_id', user!.id);
+      } else {
+        query = query.eq('requester_id', user!.id);
+      }
+
+      const { data, error } = await query.select('*').single();
 
       if (error) {
         console.error('[Appointments] Update error:', error);

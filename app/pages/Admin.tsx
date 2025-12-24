@@ -14,6 +14,7 @@ import { toast } from '@/hooks/use-toast';
 import { Users, Home, MessageSquare, Star, TrendingUp, BarChart3, LineChart, PieChart } from 'lucide-react';
 import { LineChart as RechartsLineChart, Line, BarChart as RechartsBarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { logApprovalAction, REVIEW_STATUS } from '@/lib/approval';
+import { requireAdmin, logSecurityEvent, handleSecurityError } from '@/lib/security';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -276,14 +277,24 @@ export default function Admin() {
 
   const verifyListing = async (listingId: string, isVerified: boolean) => {
     // APPROVAL WORKFLOW: Admin approval/rejection of listings
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    
+    // SECURITY: Re-verify admin status before performing action
+    try {
+      await requireAdmin(currentUser!);
+    } catch (error) {
+      logSecurityEvent('ADMIN_VERIFY_LISTING_UNAUTHORIZED', currentUser?.id || 'unknown', { listingId });
+      const toastData = handleSecurityError(error);
+      toast(toastData);
+      return;
+    }
+
     // Get listing details before updating
     const { data: listing } = await supabase
       .from('room_listings')
       .select('*, profiles!owner_id(email, full_name)')
       .eq('id', listingId)
       .single();
-
-    const currentUser = (await supabase.auth.getUser()).data.user;
 
     const { error } = await supabase
       .from('room_listings')
@@ -331,6 +342,17 @@ export default function Admin() {
   };
 
   const deleteReview = async (reviewId: string) => {
+    // SECURITY: Re-verify admin status before performing action
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    try {
+      await requireAdmin(currentUser!);
+    } catch (error) {
+      logSecurityEvent('ADMIN_DELETE_REVIEW_UNAUTHORIZED', currentUser?.id || 'unknown', { reviewId });
+      const toastData = handleSecurityError(error);
+      toast(toastData);
+      return;
+    }
+
     const { error } = await supabase
       .from('reviews')
       .delete()
@@ -343,6 +365,7 @@ export default function Admin() {
         variant: "destructive"
       });
     } else {
+      logSecurityEvent('ADMIN_DELETED_REVIEW', currentUser?.id || 'unknown', { reviewId });
       toast({
         title: "Success",
         description: "Review deleted successfully"
@@ -859,6 +882,30 @@ export default function Admin() {
   };
 
   const assignRole = async (userId: string, role: 'admin' | 'moderator' | 'user') => {
+    // SECURITY: Re-verify admin status before assigning roles (critical operation!)
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    try {
+      await requireAdmin(currentUser!);
+    } catch (error) {
+      logSecurityEvent('ADMIN_ASSIGN_ROLE_UNAUTHORIZED', currentUser?.id || 'unknown', { 
+        targetUserId: userId, 
+        attemptedRole: role 
+      });
+      const toastData = handleSecurityError(error);
+      toast(toastData);
+      return;
+    }
+
+    // SECURITY: Prevent self-demotion to avoid lockout
+    if (userId === currentUser?.id && role !== 'admin') {
+      toast({
+        title: "Error",
+        description: "You cannot remove your own admin privileges",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const { error } = await supabase
       .from('user_roles')
       .upsert({ user_id: userId, role }, { onConflict: 'user_id,role' });
@@ -870,6 +917,10 @@ export default function Admin() {
         variant: "destructive"
       });
     } else {
+      logSecurityEvent('ADMIN_ROLE_ASSIGNED', currentUser?.id || 'unknown', { 
+        targetUserId: userId, 
+        role 
+      });
       toast({
         title: "Success",
         description: `Role ${role} assigned successfully`
