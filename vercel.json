@@ -1,4 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "rewrites": [
+    {
+      "source": "/((?!api|_next|favicon.ico|manifest.json|robots.txt|sitemap.xml|og-image.png|assets).*)",
+      "destination": "/"
+    }
+  ]
 }
