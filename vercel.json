@@ -1,4 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "routes": [
+    { "src": "/((?!api|_next|favicon|manifest|robots|sitemap|og-).*)", "dest": "/" }
+  ]
 }
